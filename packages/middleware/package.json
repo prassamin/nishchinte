@@ -1,0 +1,39 @@
+{
+  "name": "@nishchinte/middleware",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "package.json"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rm -rf dist"
+  },
+  "peerDependencies": {
+    "next": ">=14.0.0"
+  },
+  "dependencies": {
+    "@nishchinte/config": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.2",
+    "next": "16.3.4",
+    "tsup": "^8.5.1",
+    "typescript": "^5.6.3"
+  }
+}
