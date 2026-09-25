@@ -1,0 +1,31 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "dev": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "persistent": true
+    },
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", ".next/**"],
+      "inputs": [
+        "src/**",
+        "prisma/**",
+        "generated/**",
+        "tsup.config.*",
+        "tsconfig*.json",
+        "package.json",
+        "nishchinte.config.ts",
+        ".env*"
+      ]
+    },
+    "lint": {
+      "dependsOn": ["^lint"]
+    },
+    "test": {
+      "dependsOn": ["^test"],
+      "outputs": ["coverage/**"]
+    }
+  }
+}

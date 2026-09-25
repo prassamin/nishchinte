@@ -1,0 +1,25 @@
+packages:
+  - apps/*
+  - packages/*
+
+allowBuilds:
+  '@prisma/engines': true
+  esbuild: true
+  msgpackr-extract: true
+  prisma: true
+  unrs-resolver: true
+  workerd: true
+
+minimumReleaseAgeExclude:
+  - '@heroui/react@3.2.5'
+  - '@heroui/styles@3.2.5'
+  - zod@4.6.2
+  - '@keybindy/core@2.0.2'
+  - '@keybindy/react@2.0.2'
+
+overrides:
+  prosemirror-model: '^1.25.11'
+  prosemirror-state: '^1.4.4'
+  prosemirror-view: '^1.42.3'
+  prosemirror-transform: '^1.12.0'
+
