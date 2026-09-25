@@ -1,0 +1,192 @@
+@import "tailwindcss";
+@import "@heroui/styles";
+@import "@nishchinte/confirm";
+
+@source "../src";
+
+@custom-variant has-data-dashboard (&:has([data-dashboard]));
+
+@theme inline {
+  --color-ap-background: var(--background);
+  --color-ap-foreground: var(--foreground);
+  --color-ap-accent: var(--accent);
+  --color-ap-accent-soft: var(--accent-soft);
+  --color-ap-accent-foreground: var(--accent-foreground);
+  --color-ap-border: var(--border);
+  --color-ap-danger: var(--danger);
+  --color-ap-danger-foreground: var(--danger-foreground);
+  --color-ap-default: var(--default);
+  --color-ap-default-foreground: var(--default-foreground);
+  --color-ap-divider: var(--divider);
+  --color-ap-field-background: var(--field-background);
+  --color-ap-field-foreground: var(--field-foreground);
+  --color-ap-field-placeholder: var(--field-placeholder);
+  --color-ap-focus: var(--focus);
+  --color-ap-muted: var(--muted);
+  --color-ap-overlay: var(--overlay);
+  --color-ap-overlay-foreground: var(--overlay-foreground);
+  --color-ap-scrollbar: var(--scrollbar);
+  --color-ap-segment: var(--segment);
+  --color-ap-segment-foreground: var(--segment-foreground);
+  --color-ap-separator: var(--separator);
+  --color-ap-success: var(--success);
+  --color-ap-success-foreground: var(--success-foreground);
+  --color-ap-surface: var(--surface);
+  --color-ap-surface-foreground: var(--surface-foreground);
+  --color-ap-surface-secondary: var(--surface-secondary);
+  --color-ap-surface-secondary-foreground: var(--surface-secondary-foreground);
+  --color-ap-surface-tertiary: var(--surface-tertiary);
+  --color-ap-surface-tertiary-foreground: var(--surface-tertiary-foreground);
+  --color-ap-warning: var(--warning);
+  --color-ap-warning-foreground: var(--warning-foreground);
+  --color-ap-background-secondary: var(--background-secondary);
+
+  --font-ap-brand: var(--font-sans);
+}
+
+:root:has([data-admin-panel="default"]):has([data-theme="light"]),
+:root:has([data-admin-panel="default"]):has(.light),
+:root:has([data-admin-panel="default"]):not(:has([data-theme="dark"])):not(
+    :has(.dark)
+  ) {
+  /* Theme Colors (Light Mode) */
+  --accent: oklch(72% 0.19 38);
+  --accent-soft: oklch(88% 0.11 38);
+  --accent-foreground: oklch(18% 0.03 38);
+  --background: oklch(97.5% 0.005 80);
+  --background-secondary: oklch(22% 0 0);
+  --border: oklch(89.5% 0.008 80);
+  --divider: oklch(91% 0.008 80);
+  --danger: oklch(65.32% 0.2356 19.88);
+  --danger-foreground: oklch(99.11% 0 0);
+  --default: oklch(94.4% 0.007 80);
+  --default-foreground: oklch(21.2% 0.008 80);
+  --field-background: oklch(100% 0.003 80);
+  --field-foreground: oklch(21.2% 0.008 80);
+  --field-placeholder: oklch(54.5% 0.012 80);
+  --focus: oklch(72% 0.19 38);
+  --foreground: oklch(21.2% 0.008 80);
+  --muted: oklch(54.5% 0.012 80);
+  --overlay: oklch(100% 0.002 80);
+  --overlay-foreground: oklch(21.2% 0.008 80);
+  --scrollbar: oklch(87% 0.007 80);
+  --segment: oklch(100% 0.006 80);
+  --segment-foreground: oklch(21.2% 0.008 80);
+  --separator: oklch(91.7% 0.007 80);
+  --success: oklch(73.29% 0.1958 144.95);
+  --success-foreground: oklch(21.03% 0.0059 144.95);
+  --surface: oklch(100% 0.003 80);
+  --surface-foreground: oklch(21.2% 0.008 80);
+  --surface-secondary: oklch(95.5% 0.005 80);
+  --surface-secondary-foreground: oklch(21.2% 0.008 80);
+  --surface-tertiary: oklch(94% 0.006 80);
+  --surface-tertiary-foreground: oklch(21.2% 0.008 80);
+  --warning: oklch(78.19% 0.1604 66.47);
+  --warning-foreground: oklch(21.03% 0.0059 66.47);
+}
+
+:root:has([data-admin-panel="default"]):has([data-theme="dark"]),
+:root:has([data-admin-panel="default"]):has(.dark) {
+  color-scheme: dark;
+  /* Theme Colors (Dark Mode) */
+  --accent: oklch(78% 0.17 42);
+  --accent-soft: oklch(45% 0.12 42);
+  --accent-foreground: oklch(18% 0.03 42);
+  --background: oklch(13% 0.006 80);
+  --background-secondary: oklch(22% 0.008 80);
+  --border: oklch(28.5% 0.007 80);
+  --divider: oklch(26% 0.007 80);
+  --danger: oklch(59.4% 0.1991 18.77);
+  --danger-foreground: oklch(99.11% 0 0);
+  --default: oklch(27.6% 0.007 80);
+  --default-foreground: oklch(99.11% 0 0);
+  --field-background: oklch(21.4% 0.011 80);
+  --field-foreground: oklch(99.11% 0.006 80);
+  --field-placeholder: oklch(70.2% 0.012 80);
+  --focus: oklch(78% 0.17 42);
+  --foreground: oklch(99.11% 0.006 80);
+  --muted: oklch(70.2% 0.012 80);
+  --overlay: oklch(21.4% 0.011 80);
+  --overlay-foreground: oklch(99.11% 0.006 80);
+  --scrollbar: oklch(70.2% 0.007 80);
+  --segment: oklch(39.8% 0.007 80);
+  --segment-foreground: oklch(99.11% 0.006 80);
+  --separator: oklch(25.3% 0.007 80);
+  --success: oklch(73.29% 0.1958 144.95);
+  --success-foreground: oklch(21.03% 0.0059 144.95);
+  --surface: oklch(21.4% 0.011 80);
+  --surface-foreground: oklch(99.11% 0.006 80);
+  --surface-secondary: oklch(25.9% 0.009 80);
+  --surface-secondary-foreground: oklch(99.11% 0.006 80);
+  --surface-tertiary: oklch(27.4% 0.009 80);
+  --surface-tertiary-foreground: oklch(99.11% 0.006 80);
+  --warning: oklch(82.03% 0.1405 70.48);
+  --warning-foreground: oklch(21.03% 0.0059 70.48);
+}
+
+:root:has([data-admin-panel="default"]) {
+  /* Applies to the container itself */
+  & {
+    font-family: var(--font-sans), sans-serif;
+  }
+
+  body {
+    @apply has-data-dashboard:bg-background-secondary has-data-dashboard:scrollbar-hidden has-data-dashboard:overflow-hidden has-data-dashboard:h-screen;
+
+    font-family: var(--font-sans), sans-serif;
+  }
+
+  button,
+  a {
+    @apply cursor-pointer;
+  }
+
+  input {
+    @apply overflow-hidden;
+  }
+
+  [data-slot="menu-item"] {
+    @apply ring-0 ring-offset-0;
+  }
+}
+
+@utility scrollbar-hidden {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@utility number-arrow-none {
+  @apply [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none;
+}
+
+@utility scrollbar-auto {
+  @apply [scrollbar-width:auto] [&::-webkit-scrollbar]:block;
+}
+
+@utility scrollbar-styled {
+  @apply [scrollbar-width:auto];
+
+  &::-webkit-scrollbar {
+    @apply block w-2 h-2;
+  }
+
+  &::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    @apply bg-muted/70 rounded-full;
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted/50;
+  }
+
+  &::-webkit-scrollbar-button {
+    @apply hidden;
+  }
+}

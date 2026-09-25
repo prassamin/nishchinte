@@ -1,0 +1,96 @@
+{
+  "name": "@nishchinte/admin-panel",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "style": "./dist/index.css",
+  "exports": {
+    ".": {
+      "style": "./dist/index.css",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
+      "default": "./dist/index.js"
+    },
+    "./plugins": {
+      "types": "./dist/plugins.d.ts",
+      "import": "./dist/plugins.js",
+      "require": "./dist/plugins.cjs",
+      "default": "./dist/plugins.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "package.json"
+  ],
+  "scripts": {
+    "build": "tsup && tsc --emitDeclarationOnly",
+    "dev": "tsup --watch",
+    "clean": "rm -rf dist"
+  },
+  "peerDependencies": {
+    "next": ">=14.0.0",
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0"
+  },
+  "peerDependenciesMeta": {
+    "next": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "@bprogress/next": "^3.2.12",
+    "@heroui/react": "^3.2.5",
+    "@heroui/styles": "^3.2.5",
+    "@internationalized/date": "^3.12.4",
+    "@keybindy/react": "^2.0.2",
+    "@nishchinte/auth": "workspace:*",
+    "@nishchinte/bangladesh-address": "workspace:*",
+    "@nishchinte/config": "workspace:*",
+    "@nishchinte/confirm": "workspace:*",
+    "@nishchinte/currency": "workspace:*",
+    "@nishchinte/db": "workspace:*",
+    "@nishchinte/hooks": "workspace:*",
+    "@nishchinte/realtime": "workspace:*",
+    "@nishchinte/server": "workspace:*",
+    "@nishchinte/storage": "workspace:*",
+    "@nishchinte/utils": "workspace:*",
+    "@tanstack/react-query": "^5.102.8",
+    "@tiptap/extension-bubble-menu": "^3.31.3",
+    "@tiptap/extension-image": "^3.31.3",
+    "@tiptap/extension-link": "^3.31.3",
+    "@tiptap/extension-placeholder": "^3.31.3",
+    "@tiptap/extension-text-align": "^3.31.3",
+    "@tiptap/extension-underline": "^3.31.3",
+    "@tiptap/pm": "^3.31.3",
+    "@tiptap/react": "^3.31.3",
+    "@tiptap/starter-kit": "^3.31.3",
+    "framer-motion": "^13.4.0",
+    "libphonenumber-js": "^1.13.13",
+    "lucide-react": "^1.44.0",
+    "tiptap-markdown": "^0.9.0",
+    "zod": "^4.6.5",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.2",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "next": "16.3.4",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "tailwindcss": "^4.3.3",
+    "tsup": "^8.5.1",
+    "typescript": "^5.6.3"
+  }
+}
