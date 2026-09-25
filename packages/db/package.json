@@ -1,0 +1,47 @@
+{
+  "name": "@nishchinte/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "prisma",
+    "prisma.config.ts",
+    "README.md",
+    "package.json"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rm -rf dist",
+    "generate": "pnpm exec prisma generate",
+    "migrate:dev": "pnpm exec prisma migrate dev",
+    "migrate:deploy": "pnpm exec prisma migrate deploy",
+    "db:push": "pnpm exec prisma db push",
+    "studio": "pnpm exec prisma studio"
+  },
+  "dependencies": {
+    "@nishchinte/config": "workspace:*",
+    "@nishchinte/realtime": "workspace:*",
+    "@prisma/adapter-mariadb": "^7.10.0",
+    "@prisma/client": "7.10.0",
+    "dotenv": "^17.4.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.2",
+    "prisma": "7.10.0",
+    "tsup": "^8.5.1",
+    "typescript": "^5.6.3"
+  }
+}
