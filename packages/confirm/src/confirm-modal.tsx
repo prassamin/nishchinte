@@ -53,10 +53,10 @@ export function ConfirmModal({
                     )}
                   </div>
                   <div className="space-y-1.5">
-                    <h3 className="text-[22px] font-bold tracking-tight text-foreground">
+                    <h3 className="text-[22px] font-bold tracking-tight text-foreground wrap-break-word">
                       {title}
                     </h3>
-                    <p className="mx-auto max-w-[34ch] text-[15px] leading-6 text-muted">
+                    <p className="mx-auto max-w-[34ch] text-[15px] leading-6 text-muted wrap-break-word">
                       {description}
                     </p>
                   </div>

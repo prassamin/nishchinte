@@ -72,8 +72,13 @@ import {
 import {
   createOrderAction,
   getOrderByIdAction,
+  listOrdersAction,
   listCustomerOrdersAction,
+  updateOrderAction,
   updateOrderStatusAction,
+  deleteOrderAction,
+  bulkDeleteOrdersAction,
+  bulkUpdateOrderStatusAction,
 } from "./orders";
 
 /**
@@ -551,6 +556,11 @@ export const actions = {
    */
   order: {
     /**
+     * Lists orders with search, filters (status, payment, date), pagination, and sorting (Admin).
+     */
+    list: listOrdersAction,
+
+    /**
      * Places a new Cash on Delivery order with inventory tracking and coupon support.
      */
     create: createOrderAction,
@@ -561,14 +571,34 @@ export const actions = {
     getById: getOrderByIdAction,
 
     /**
-     * Lists orders placed by the currently authenticated customer.
+     * Updates an existing order's status, payment, notes, or logistics (Admin).
      */
-    listMyOrders: listCustomerOrdersAction,
+    update: updateOrderAction,
 
     /**
      * Updates an order's status and logs to the order timeline (Admin).
      */
     updateStatus: updateOrderStatusAction,
+
+    /**
+     * Deletes a single order by ID (Admin).
+     */
+    delete: deleteOrderAction,
+
+    /**
+     * Bulk deletes multiple orders by IDs (Admin).
+     */
+    bulkDelete: bulkDeleteOrdersAction,
+
+    /**
+     * Bulk updates status for multiple orders (Admin).
+     */
+    bulkUpdateStatus: bulkUpdateOrderStatusAction,
+
+    /**
+     * Lists orders placed by the currently authenticated customer.
+     */
+    listMyOrders: listCustomerOrdersAction,
   },
 };
 
@@ -656,10 +686,17 @@ export type {
 } from "./coupons";
 
 export type {
+  OrderStatus,
+  PaymentStatus,
+  PaymentMethod,
+  DeliveryType,
   CreateOrderItemInput,
   CreateOrderAddressInput,
   CreateOrderInput,
   OrderItemSnapshot,
   OrderSummaryItem,
+  OrderTimelineItem,
   ListOrdersInput,
+  ListOrdersResult,
+  UpdateOrderInput,
 } from "./orders";

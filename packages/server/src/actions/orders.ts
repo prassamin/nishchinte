@@ -1,10 +1,19 @@
 "use server";
 
-import { prisma, type OrderStatus, type PaymentStatus, type DeliveryType } from "@nishchinte/db";
+import {
+  prisma,
+  Prisma,
+  type OrderStatus,
+  type PaymentStatus,
+  type PaymentMethod,
+  type DeliveryType,
+} from "@nishchinte/db";
 import { auth } from "@nishchinte/auth/server";
 import { getConfig } from "@nishchinte/config";
 import { validateCouponForCheckoutAction } from "./coupons";
 import { safeRevalidate } from "./utils";
+
+export type { OrderStatus, PaymentStatus, PaymentMethod, DeliveryType };
 
 export interface CreateOrderItemInput {
   productId: string;
@@ -50,6 +59,15 @@ export interface OrderItemSnapshot {
   metadata: Record<string, unknown> | null;
 }
 
+export interface OrderTimelineItem {
+  id: string;
+  status: OrderStatus | null;
+  title: string;
+  note: string | null;
+  actorType: string;
+  createdAt: Date;
+}
+
 export interface OrderSummaryItem {
   id: string;
   orderNumber: string;
@@ -81,28 +99,150 @@ export interface OrderSummaryItem {
   createdAt: Date;
   updatedAt: Date;
   items?: OrderItemSnapshot[];
-  shippingAddress?: CreateOrderAddressInput & { id: string } | null;
-  timeline?: Array<{
+  itemCount?: number;
+  customer?: {
     id: string;
-    status: OrderStatus | null;
-    title: string;
-    note: string | null;
-    actorType: string;
-    createdAt: Date;
-  }>;
+    name: string;
+    phone: string | null;
+    email: string | null;
+    avatarUrl?: string | null;
+    totalOrders?: number;
+  } | null;
+  shippingAddress?: (CreateOrderAddressInput & { id: string }) | null;
+  timeline?: OrderTimelineItem[];
 }
 
 export interface ListOrdersInput {
   page?: number;
   limit?: number;
   q?: string;
+  search?: string;
   status?: OrderStatus | "ALL";
   paymentStatus?: PaymentStatus | "ALL";
+  deliveryType?: DeliveryType | "ALL";
   customerId?: string;
   startDate?: string | Date;
   endDate?: string | Date;
-  sortBy?: "placedAt" | "totalAmount" | "orderNumber";
+  sortBy?: "placedAt" | "createdAt" | "totalAmount" | "orderNumber";
   sortOrder?: "asc" | "desc";
+}
+
+export interface ListOrdersResult {
+  ok: true;
+  orders: OrderSummaryItem[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+  statusCounts: Record<string, number>;
+  paymentCounts: Record<string, number>;
+}
+
+export interface UpdateOrderInput {
+  orderId: string;
+  status?: OrderStatus;
+  paymentStatus?: PaymentStatus;
+  adminNotes?: string | null;
+  courierName?: string | null;
+  trackingNumber?: string | null;
+  consignmentId?: string | null;
+  note?: string;
+}
+
+/**
+ * Transforms a Prisma Order model into a clean, JSON-serializable OrderSummaryItem.
+ */
+function transformOrder(order: any): OrderSummaryItem {
+  const items: OrderItemSnapshot[] = Array.isArray(order.items)
+    ? order.items.map((i: any) => ({
+        id: i.id,
+        productId: i.productId,
+        variantId: i.variantId,
+        productName: i.productName,
+        variantTitle: i.variantTitle,
+        sku: i.sku,
+        imageUrl: i.imageUrl,
+        unitPrice: Number(i.unitPrice ?? 0),
+        costPrice: i.costPrice ? Number(i.costPrice) : null,
+        quantity: i.quantity,
+        subtotal: Number(i.subtotal ?? 0),
+        discount: Number(i.discount ?? 0),
+        total: Number(i.total ?? 0),
+        metadata: (i.metadata as Record<string, unknown>) || null,
+      }))
+    : [];
+
+  const itemCount = items.reduce((acc, it) => acc + (it.quantity || 1), 0);
+
+  return {
+    id: order.id,
+    orderNumber: order.orderNumber,
+    invoiceNumber: order.invoiceNumber,
+    customerId: order.customerId,
+    customerName: order.customerName,
+    customerPhone: order.customerPhone,
+    customerEmail: order.customerEmail,
+    customerNotes: order.customerNotes,
+    adminNotes: order.adminNotes,
+    status: order.status,
+    paymentStatus: order.paymentStatus,
+    paymentMethod: order.paymentMethod ?? "CASH_ON_DELIVERY",
+    deliveryType: order.deliveryType ?? "STANDARD",
+    currency: order.currency ?? "BDT",
+    subtotal: Number(order.subtotal ?? 0),
+    shippingFee: Number(order.shippingFee ?? 0),
+    discountAmount: Number(order.discountAmount ?? 0),
+    totalAmount: Number(order.totalAmount ?? 0),
+    couponCode: order.couponCode,
+    courierName: order.courierName,
+    trackingNumber: order.trackingNumber,
+    consignmentId: order.consignmentId,
+    placedAt: new Date(order.placedAt),
+    confirmedAt: order.confirmedAt ? new Date(order.confirmedAt) : null,
+    shippedAt: order.shippedAt ? new Date(order.shippedAt) : null,
+    deliveredAt: order.deliveredAt ? new Date(order.deliveredAt) : null,
+    cancelledAt: order.cancelledAt ? new Date(order.cancelledAt) : null,
+    createdAt: new Date(order.createdAt),
+    updatedAt: new Date(order.updatedAt),
+    items,
+    itemCount,
+    customer: order.customer
+      ? {
+          id: order.customer.id,
+          name: order.customer.name,
+          phone: order.customer.phone,
+          email: order.customer.email,
+          avatarUrl: order.customer.avatarUrl,
+          totalOrders: order.customer._count?.orders ?? undefined,
+        }
+      : null,
+    shippingAddress: order.shippingAddress
+      ? {
+          id: order.shippingAddress.id,
+          name: order.shippingAddress.name,
+          phone: order.shippingAddress.phone,
+          alternativePhone: order.shippingAddress.alternativePhone,
+          email: order.shippingAddress.email,
+          division: order.shippingAddress.division,
+          district: order.shippingAddress.district,
+          upazila: order.shippingAddress.upazila,
+          streetAddress: order.shippingAddress.streetAddress,
+          postalCode: order.shippingAddress.postalCode,
+        }
+      : null,
+    timeline: Array.isArray(order.timeline)
+      ? order.timeline.map((t: any) => ({
+          id: t.id,
+          status: t.status,
+          title: t.title,
+          note: t.note,
+          actorType: t.actorType,
+          createdAt: new Date(t.createdAt),
+        }))
+      : undefined,
+  };
 }
 
 /**
@@ -116,6 +256,188 @@ function generateOrderNumber(): string {
   const day = String(date.getDate()).padStart(2, "0");
   const randomSuffix = Math.floor(1000 + Math.random() * 9000);
   return `ORD-${year}${month}${day}-${randomSuffix}`;
+}
+
+/**
+ * Server Action: Lists orders for administrative panel with comprehensive search, filters, pagination, and sorting.
+ */
+export async function listOrdersAction(
+  options: ListOrdersInput = {},
+): Promise<ListOrdersResult> {
+  await auth.admin.requireUser();
+
+  const page = Math.max(1, options.page || 1);
+  const limit = Math.min(100, Math.max(1, options.limit || 15));
+  const skip = (page - 1) * limit;
+  const search = (options.q || options.search || "").trim();
+
+  const where: Prisma.OrderWhereInput = {};
+
+  if (search) {
+    where.OR = [
+      { orderNumber: { contains: search } },
+      { customerName: { contains: search } },
+      { customerPhone: { contains: search } },
+      { customerEmail: { contains: search } },
+      { trackingNumber: { contains: search } },
+      { consignmentId: { contains: search } },
+      {
+        shippingAddress: {
+          OR: [
+            { name: { contains: search } },
+            { phone: { contains: search } },
+            { district: { contains: search } },
+            { upazila: { contains: search } },
+            { streetAddress: { contains: search } },
+          ],
+        },
+      },
+    ];
+  }
+
+  if (options.status && options.status !== "ALL") {
+    where.status = options.status;
+  }
+
+  if (options.paymentStatus && options.paymentStatus !== "ALL") {
+    where.paymentStatus = options.paymentStatus;
+  }
+
+  if (options.deliveryType && options.deliveryType !== "ALL") {
+    where.deliveryType = options.deliveryType;
+  }
+
+  if (options.customerId) {
+    where.customerId = options.customerId;
+  }
+
+  if (options.startDate || options.endDate) {
+    where.placedAt = {};
+    if (options.startDate) where.placedAt.gte = new Date(options.startDate);
+    if (options.endDate) where.placedAt.lte = new Date(options.endDate);
+  }
+
+  const sortBy = options.sortBy || "placedAt";
+  const sortOrder = options.sortOrder || "desc";
+
+  const [total, orders, totalAllCount, statusGroups, paymentGroups] =
+    await Promise.all([
+      prisma.order.count({ where }),
+      prisma.order.findMany({
+        where,
+        include: {
+          items: true,
+          shippingAddress: true,
+          customer: {
+            select: {
+              id: true,
+              name: true,
+              phone: true,
+              email: true,
+              avatarUrl: true,
+              _count: { select: { orders: true } },
+            },
+          },
+        },
+        orderBy: {
+          [sortBy]: sortOrder,
+        },
+        skip,
+        take: limit,
+      }),
+      prisma.order.count(),
+      prisma.order.groupBy({
+        by: ["status"],
+        _count: { _all: true },
+      }),
+      prisma.order.groupBy({
+        by: ["paymentStatus"],
+        _count: { _all: true },
+      }),
+    ]);
+
+  const statusCounts: Record<string, number> = {
+    ALL: totalAllCount,
+    PENDING: 0,
+    CONFIRMED: 0,
+    PROCESSING: 0,
+    SHIPPED: 0,
+    DELIVERED: 0,
+    RETURNED: 0,
+    CANCELLED: 0,
+  };
+
+  for (const g of statusGroups) {
+    statusCounts[g.status] = g._count._all;
+  }
+
+  const paymentCounts: Record<string, number> = {
+    ALL: totalAllCount,
+    PENDING: 0,
+    PAID: 0,
+    CANCELLED: 0,
+  };
+
+  for (const g of paymentGroups) {
+    paymentCounts[g.paymentStatus] = g._count._all;
+  }
+
+  return {
+    ok: true,
+    orders: orders.map(transformOrder),
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit) || 1,
+    },
+    statusCounts,
+    paymentCounts,
+  };
+}
+
+/**
+ * Server Action: Retrieves an order by its ID or readable order number.
+ */
+export async function getOrderByIdAction(
+  orderIdOrNumber: string,
+): Promise<{ ok: true; order: OrderSummaryItem } | { ok: false; error: string }> {
+  try {
+    const order = await prisma.order.findFirst({
+      where: {
+        OR: [{ id: orderIdOrNumber }, { orderNumber: orderIdOrNumber }],
+      },
+      include: {
+        items: true,
+        shippingAddress: true,
+        customer: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            email: true,
+            avatarUrl: true,
+            _count: { select: { orders: true } },
+          },
+        },
+        timeline: {
+          orderBy: { createdAt: "desc" },
+        },
+      },
+    });
+
+    if (!order) {
+      return { ok: false, error: "Order not found." };
+    }
+
+    return {
+      ok: true,
+      order: transformOrder(order),
+    };
+  } catch (error: any) {
+    console.error("getOrderByIdAction error:", error);
+    return { ok: false, error: error?.message || "Failed to retrieve order." };
+  }
 }
 
 /**
@@ -474,184 +796,15 @@ export async function createOrderAction(
     safeRevalidate("/products");
     safeRevalidate("/checkout");
     safeRevalidate("/account/orders");
+    safeRevalidate("/admin/orders");
 
     return {
       ok: true,
-      order: {
-        id: createdOrder.id,
-        orderNumber: createdOrder.orderNumber,
-        invoiceNumber: createdOrder.invoiceNumber,
-        customerId: createdOrder.customerId,
-        customerName: createdOrder.customerName,
-        customerPhone: createdOrder.customerPhone,
-        customerEmail: createdOrder.customerEmail,
-        customerNotes: createdOrder.customerNotes,
-        adminNotes: createdOrder.adminNotes,
-        status: createdOrder.status,
-        paymentStatus: createdOrder.paymentStatus,
-        paymentMethod: "CASH_ON_DELIVERY",
-        deliveryType: createdOrder.deliveryType,
-        currency: createdOrder.currency,
-        subtotal: Number(createdOrder.subtotal),
-        shippingFee: Number(createdOrder.shippingFee),
-        discountAmount: Number(createdOrder.discountAmount),
-        totalAmount: Number(createdOrder.totalAmount),
-        couponCode: createdOrder.couponCode,
-        courierName: createdOrder.courierName,
-        trackingNumber: createdOrder.trackingNumber,
-        consignmentId: createdOrder.consignmentId,
-        placedAt: createdOrder.placedAt,
-        confirmedAt: createdOrder.confirmedAt,
-        shippedAt: createdOrder.shippedAt,
-        deliveredAt: createdOrder.deliveredAt,
-        cancelledAt: createdOrder.cancelledAt,
-        createdAt: createdOrder.createdAt,
-        updatedAt: createdOrder.updatedAt,
-        items: createdOrder.items.map((i) => ({
-          id: i.id,
-          productId: i.productId,
-          variantId: i.variantId,
-          productName: i.productName,
-          variantTitle: i.variantTitle,
-          sku: i.sku,
-          imageUrl: i.imageUrl,
-          unitPrice: Number(i.unitPrice),
-          costPrice: i.costPrice ? Number(i.costPrice) : null,
-          quantity: i.quantity,
-          subtotal: Number(i.subtotal),
-          discount: Number(i.discount),
-          total: Number(i.total),
-          metadata: (i.metadata as Record<string, unknown>) || null,
-        })),
-        shippingAddress: createdOrder.shippingAddress
-          ? {
-              id: createdOrder.shippingAddress.id,
-              name: createdOrder.shippingAddress.name,
-              phone: createdOrder.shippingAddress.phone,
-              alternativePhone: createdOrder.shippingAddress.alternativePhone,
-              email: createdOrder.shippingAddress.email,
-              division: createdOrder.shippingAddress.division,
-              district: createdOrder.shippingAddress.district,
-              upazila: createdOrder.shippingAddress.upazila,
-              streetAddress: createdOrder.shippingAddress.streetAddress,
-              postalCode: createdOrder.shippingAddress.postalCode,
-            }
-          : null,
-        timeline: createdOrder.timeline.map((t) => ({
-          id: t.id,
-          status: t.status,
-          title: t.title,
-          note: t.note,
-          actorType: t.actorType,
-          createdAt: t.createdAt,
-        })),
-      },
+      order: transformOrder(createdOrder),
     };
   } catch (error: any) {
     console.error("createOrderAction error:", error);
     return { ok: false, error: error?.message || "Failed to place order. Please try again." };
-  }
-}
-
-/**
- * Server Action: Retrieves an order by its ID or readable order number.
- */
-export async function getOrderByIdAction(
-  orderIdOrNumber: string,
-): Promise<{ ok: true; order: OrderSummaryItem } | { ok: false; error: string }> {
-  try {
-    const order = await prisma.order.findFirst({
-      where: {
-        OR: [{ id: orderIdOrNumber }, { orderNumber: orderIdOrNumber }],
-      },
-      include: {
-        items: true,
-        shippingAddress: true,
-        timeline: {
-          orderBy: { createdAt: "desc" },
-        },
-      },
-    });
-
-    if (!order) {
-      return { ok: false, error: "Order not found." };
-    }
-
-    return {
-      ok: true,
-      order: {
-        id: order.id,
-        orderNumber: order.orderNumber,
-        invoiceNumber: order.invoiceNumber,
-        customerId: order.customerId,
-        customerName: order.customerName,
-        customerPhone: order.customerPhone,
-        customerEmail: order.customerEmail,
-        customerNotes: order.customerNotes,
-        adminNotes: order.adminNotes,
-        status: order.status,
-        paymentStatus: order.paymentStatus,
-        paymentMethod: "CASH_ON_DELIVERY",
-        deliveryType: order.deliveryType,
-        currency: order.currency,
-        subtotal: Number(order.subtotal),
-        shippingFee: Number(order.shippingFee),
-        discountAmount: Number(order.discountAmount),
-        totalAmount: Number(order.totalAmount),
-        couponCode: order.couponCode,
-        courierName: order.courierName,
-        trackingNumber: order.trackingNumber,
-        consignmentId: order.consignmentId,
-        placedAt: order.placedAt,
-        confirmedAt: order.confirmedAt,
-        shippedAt: order.shippedAt,
-        deliveredAt: order.deliveredAt,
-        cancelledAt: order.cancelledAt,
-        createdAt: order.createdAt,
-        updatedAt: order.updatedAt,
-        items: order.items.map((i) => ({
-          id: i.id,
-          productId: i.productId,
-          variantId: i.variantId,
-          productName: i.productName,
-          variantTitle: i.variantTitle,
-          sku: i.sku,
-          imageUrl: i.imageUrl,
-          unitPrice: Number(i.unitPrice),
-          costPrice: i.costPrice ? Number(i.costPrice) : null,
-          quantity: i.quantity,
-          subtotal: Number(i.subtotal),
-          discount: Number(i.discount),
-          total: Number(i.total),
-          metadata: (i.metadata as Record<string, unknown>) || null,
-        })),
-        shippingAddress: order.shippingAddress
-          ? {
-              id: order.shippingAddress.id,
-              name: order.shippingAddress.name,
-              phone: order.shippingAddress.phone,
-              alternativePhone: order.shippingAddress.alternativePhone,
-              email: order.shippingAddress.email,
-              division: order.shippingAddress.division,
-              district: order.shippingAddress.district,
-              upazila: order.shippingAddress.upazila,
-              streetAddress: order.shippingAddress.streetAddress,
-              postalCode: order.shippingAddress.postalCode,
-            }
-          : null,
-        timeline: order.timeline.map((t) => ({
-          id: t.id,
-          status: t.status,
-          title: t.title,
-          note: t.note,
-          actorType: t.actorType,
-          createdAt: t.createdAt,
-        })),
-      },
-    };
-  } catch (error: any) {
-    console.error("getOrderByIdAction error:", error);
-    return { ok: false, error: error?.message || "Failed to retrieve order." };
   }
 }
 
@@ -670,64 +823,138 @@ export async function listCustomerOrdersAction(): Promise<{
       include: {
         items: true,
         shippingAddress: true,
+        timeline: {
+          orderBy: { createdAt: "desc" },
+        },
       },
       orderBy: { placedAt: "desc" },
     });
 
     return {
       ok: true,
-      orders: orders.map((o) => ({
-        id: o.id,
-        orderNumber: o.orderNumber,
-        invoiceNumber: o.invoiceNumber,
-        customerId: o.customerId,
-        customerName: o.customerName,
-        customerPhone: o.customerPhone,
-        customerEmail: o.customerEmail,
-        customerNotes: o.customerNotes,
-        adminNotes: o.adminNotes,
-        status: o.status,
-        paymentStatus: o.paymentStatus,
-        paymentMethod: "CASH_ON_DELIVERY",
-        deliveryType: o.deliveryType,
-        currency: o.currency,
-        subtotal: Number(o.subtotal),
-        shippingFee: Number(o.shippingFee),
-        discountAmount: Number(o.discountAmount),
-        totalAmount: Number(o.totalAmount),
-        couponCode: o.couponCode,
-        courierName: o.courierName,
-        trackingNumber: o.trackingNumber,
-        consignmentId: o.consignmentId,
-        placedAt: o.placedAt,
-        confirmedAt: o.confirmedAt,
-        shippedAt: o.shippedAt,
-        deliveredAt: o.deliveredAt,
-        cancelledAt: o.cancelledAt,
-        createdAt: o.createdAt,
-        updatedAt: o.updatedAt,
-        items: o.items.map((i) => ({
-          id: i.id,
-          productId: i.productId,
-          variantId: i.variantId,
-          productName: i.productName,
-          variantTitle: i.variantTitle,
-          sku: i.sku,
-          imageUrl: i.imageUrl,
-          unitPrice: Number(i.unitPrice),
-          costPrice: i.costPrice ? Number(i.costPrice) : null,
-          quantity: i.quantity,
-          subtotal: Number(i.subtotal),
-          discount: Number(i.discount),
-          total: Number(i.total),
-          metadata: (i.metadata as Record<string, unknown>) || null,
-        })),
-        shippingAddress: o.shippingAddress,
-      })),
+      orders: orders.map(transformOrder),
     };
   } catch (error: any) {
     console.error("listCustomerOrdersAction error:", error);
     return { ok: false, orders: [], error: error?.message || "Failed to load orders." };
+  }
+}
+
+/**
+ * Server Action: Updates an existing order (Status, Payment, Notes, Courier Details).
+ * Admin only.
+ */
+export async function updateOrderAction(
+  input: UpdateOrderInput,
+): Promise<{ ok: boolean; order?: OrderSummaryItem; error?: string }> {
+  try {
+    const admin = await auth.admin.requireUser();
+
+    const existingOrder = await prisma.order.findUnique({
+      where: { id: input.orderId },
+    });
+
+    if (!existingOrder) {
+      return { ok: false, error: "Order not found." };
+    }
+
+    const updates: Prisma.OrderUpdateInput = {};
+    const timelineEvents: Prisma.OrderTimelineCreateManyOrderInput[] = [];
+
+    const now = new Date();
+
+    if (input.status && input.status !== existingOrder.status) {
+      updates.status = input.status;
+      if (input.status === "CONFIRMED" && !existingOrder.confirmedAt) updates.confirmedAt = now;
+      if (input.status === "SHIPPED" && !existingOrder.shippedAt) updates.shippedAt = now;
+      if (input.status === "DELIVERED" && !existingOrder.deliveredAt) {
+        updates.deliveredAt = now;
+        updates.paymentStatus = "PAID";
+      }
+      if (input.status === "CANCELLED" && !existingOrder.cancelledAt) updates.cancelledAt = now;
+
+      timelineEvents.push({
+        status: input.status,
+        title: `Status changed to ${input.status}`,
+        note: input.note || null,
+        actorType: "admin",
+        actorId: admin.id,
+      });
+    }
+
+    if (input.paymentStatus && input.paymentStatus !== existingOrder.paymentStatus) {
+      updates.paymentStatus = input.paymentStatus;
+      timelineEvents.push({
+        status: existingOrder.status,
+        title: `Payment status changed to ${input.paymentStatus}`,
+        note: input.note || null,
+        actorType: "admin",
+        actorId: admin.id,
+      });
+    }
+
+    if (input.adminNotes !== undefined) {
+      updates.adminNotes = input.adminNotes?.trim() || null;
+    }
+
+    if (input.courierName !== undefined) {
+      updates.courierName = input.courierName?.trim() || null;
+    }
+
+    if (input.trackingNumber !== undefined) {
+      updates.trackingNumber = input.trackingNumber?.trim() || null;
+    }
+
+    if (input.consignmentId !== undefined) {
+      updates.consignmentId = input.consignmentId?.trim() || null;
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const order = await tx.order.update({
+        where: { id: input.orderId },
+        data: updates,
+        include: {
+          items: true,
+          shippingAddress: true,
+          customer: {
+            select: {
+              id: true,
+              name: true,
+              phone: true,
+              email: true,
+              avatarUrl: true,
+              _count: { select: { orders: true } },
+            },
+          },
+          timeline: {
+            orderBy: { createdAt: "desc" },
+          },
+        },
+      });
+
+      if (timelineEvents.length > 0) {
+        await tx.orderTimeline.createMany({
+          data: timelineEvents.map((t) => ({
+            ...t,
+            orderId: input.orderId,
+          })),
+        });
+      }
+
+      return order;
+    });
+
+    safeRevalidate("/admin/orders");
+    safeRevalidate(`/admin/orders/${existingOrder.id}`);
+    safeRevalidate(`/orders/${existingOrder.orderNumber}`);
+
+    return {
+      ok: true,
+      order: transformOrder(updated),
+    };
+  } catch (error: any) {
+    console.error("updateOrderAction error:", error);
+    return { ok: false, error: error?.message || "Failed to update order." };
   }
 }
 
@@ -739,53 +966,108 @@ export async function updateOrderStatusAction(input: {
   status: OrderStatus;
   note?: string;
 }): Promise<{ ok: boolean; error?: string }> {
+  const res = await updateOrderAction({
+    orderId: input.orderId,
+    status: input.status,
+    note: input.note,
+  });
+  return { ok: res.ok, error: res.error };
+}
+
+/**
+ * Server Action: Deletes a single order by ID (Admin only).
+ */
+export async function deleteOrderAction(
+  orderId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await auth.admin.requireUser();
+
+    await prisma.order.delete({
+      where: { id: orderId },
+    });
+
+    safeRevalidate("/admin/orders");
+    return { ok: true };
+  } catch (error: any) {
+    console.error("deleteOrderAction error:", error);
+    return { ok: false, error: error?.message || "Failed to delete order." };
+  }
+}
+
+/**
+ * Server Action: Bulk deletes multiple orders by IDs (Admin only).
+ */
+export async function bulkDeleteOrdersAction(
+  orderIds: string[],
+): Promise<{ ok: boolean; count?: number; error?: string }> {
+  try {
+    await auth.admin.requireUser();
+
+    if (!orderIds || orderIds.length === 0) {
+      return { ok: true, count: 0 };
+    }
+
+    const result = await prisma.order.deleteMany({
+      where: { id: { in: orderIds } },
+    });
+
+    safeRevalidate("/admin/orders");
+    return { ok: true, count: result.count };
+  } catch (error: any) {
+    console.error("bulkDeleteOrdersAction error:", error);
+    return { ok: false, error: error?.message || "Failed to bulk delete orders." };
+  }
+}
+
+/**
+ * Server Action: Bulk updates status for multiple orders (Admin only).
+ */
+export async function bulkUpdateOrderStatusAction(
+  orderIds: string[],
+  status: OrderStatus,
+  note?: string,
+): Promise<{ ok: boolean; count?: number; error?: string }> {
   try {
     const admin = await auth.admin.requireUser();
 
-    const order = await prisma.order.findUnique({
-      where: { id: input.orderId },
-    });
-
-    if (!order) {
-      return { ok: false, error: "Order not found." };
+    if (!orderIds || orderIds.length === 0) {
+      return { ok: true, count: 0 };
     }
 
-    const updates: Record<string, unknown> = {
-      status: input.status,
-    };
-
     const now = new Date();
-    if (input.status === "CONFIRMED" && !order.confirmedAt) updates.confirmedAt = now;
-    if (input.status === "SHIPPED" && !order.shippedAt) updates.shippedAt = now;
-    if (input.status === "DELIVERED" && !order.deliveredAt) {
+    const updates: Prisma.OrderUpdateManyMutationInput = { status };
+
+    if (status === "CONFIRMED") updates.confirmedAt = now;
+    if (status === "SHIPPED") updates.shippedAt = now;
+    if (status === "DELIVERED") {
       updates.deliveredAt = now;
       updates.paymentStatus = "PAID";
     }
-    if (input.status === "CANCELLED" && !order.cancelledAt) updates.cancelledAt = now;
+    if (status === "CANCELLED") updates.cancelledAt = now;
 
-    await prisma.$transaction([
-      prisma.order.update({
-        where: { id: input.orderId },
+    await prisma.$transaction(async (tx) => {
+      await tx.order.updateMany({
+        where: { id: { in: orderIds } },
         data: updates,
-      }),
-      prisma.orderTimeline.create({
-        data: {
-          orderId: input.orderId,
-          status: input.status,
-          title: `Status changed to ${input.status}`,
-          note: input.note || null,
+      });
+
+      await tx.orderTimeline.createMany({
+        data: orderIds.map((id) => ({
+          orderId: id,
+          status,
+          title: `Bulk status update to ${status}`,
+          note: note || null,
           actorType: "admin",
           actorId: admin.id,
-        },
-      }),
-    ]);
+        })),
+      });
+    });
 
     safeRevalidate("/admin/orders");
-    safeRevalidate(`/orders/${order.orderNumber}`);
-
-    return { ok: true };
+    return { ok: true, count: orderIds.length };
   } catch (error: any) {
-    console.error("updateOrderStatusAction error:", error);
-    return { ok: false, error: error?.message || "Failed to update order status." };
+    console.error("bulkUpdateOrderStatusAction error:", error);
+    return { ok: false, error: error?.message || "Failed to bulk update orders." };
   }
 }

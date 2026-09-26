@@ -1,93 +1,112 @@
 "use client";
 
-import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
 import {
   keepPreviousData,
   useMutation,
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { Spinner, toast } from "@heroui/react";
-import {
-  Box,
-  Boxes,
-  ChevronLeft,
-  ChevronRight,
-  Package,
-  Pencil,
-  Plus,
-  Trash2,
-} from "lucide-react";
+import { toast, type Selection } from "@heroui/react";
 import Content from "../../components/content";
 import { useConfirm } from "@nishchinte/confirm";
-import { actions } from "@nishchinte/server/actions";
-import { useNishchinte } from "@nishchinte/hooks";
+import { actions, type ProductItem } from "@nishchinte/server/actions";
+import { debounce } from "@nishchinte/utils";
+import {
+  ProductsHeader,
+  ProductsToolbar,
+  ProductsTable,
+} from "./components";
 
-type Product = {
-  id: string;
-  name: string;
-  description?: string | null;
-  price: number;
-  costPrice?: number | null;
-  images: string[];
-  inStock: boolean;
-  isActive: boolean;
-  inventoryQty: number;
-  categoryId?: string | null;
-  category?: { id: string; name: string; slug: string } | null;
-  createdAt: Date | string;
-  updatedAt?: Date | string;
-};
-
-const PAGE_SIZE = 12;
-
-function formatDate(value?: Date | string) {
-  if (!value) return "—";
-  return new Date(value).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
-
-function getInventoryLabel(product: Product) {
-  if (product.inventoryQty === -1) {
-    return { text: "Unlimited", tone: "text-ap-success" };
-  }
-
-  if (product.inventoryQty <= 0 || !product.inStock) {
-    return { text: "Out of Stock", tone: "text-ap-danger" };
-  }
-
-  if (product.inventoryQty <= 5) {
-    return {
-      text: `Low Stock (${product.inventoryQty})`,
-      tone: "text-ap-warning",
-    };
-  }
-
-  return {
-    text: `In Stock (${product.inventoryQty})`,
-    tone: "text-ap-foreground",
-  };
-}
+const DEFAULT_PAGE_SIZE = 10;
 
 export function ProductsView() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { confirm } = useConfirm();
-  const { formatMoney } = useNishchinte();
 
+  // Search and Pagination State
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [searchInput, setSearchInput] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
 
+  const updateSearchDebounced = useMemo(
+    () =>
+      debounce((value: string) => {
+        setDebouncedSearch(value);
+        setPage(1);
+      }, 300),
+    [],
+  );
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchInput(value);
+    updateSearchDebounced(value);
+  };
+
+  const handlePageSizeChange = (newSize: number) => {
+    setPageSize(newSize);
+    setPage(1);
+  };
+
+  // Selection and Status Toggling State
+  const [togglingId, setTogglingId] = useState<string[]>([]);
+  const [selectedKeys, setSelectedKeys] = useState<Selection>(new Set());
+
+  // Products Query
+  const { data, isLoading } = useQuery({
+    queryKey: ["admin-products", page, pageSize, debouncedSearch],
+    queryFn: async () => {
+      const res = await actions.product.list({
+        page,
+        limit: pageSize,
+        search: debouncedSearch.trim() || undefined,
+      });
+
+      if (!res.ok) {
+        return {
+          products: [],
+          pagination: { page: 1, limit: pageSize, total: 0, totalPages: 1 },
+        };
+      }
+      return res;
+    },
+    staleTime: 30_000,
+    placeholderData: keepPreviousData,
+  });
+
+  const products = (data?.products ?? []) as ProductItem[];
+  const totalProducts = data?.pagination?.total ?? 0;
+  const totalPages = Math.max(1, data?.pagination?.totalPages ?? 1);
+
+  // Reset page when out of range
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
+
+  // Reset selected keys on page, page size, or search change
+  useEffect(() => {
+    setSelectedKeys(new Set());
+  }, [page, pageSize, debouncedSearch]);
+
+  const selectedIds: string[] =
+    selectedKeys === "all"
+      ? products.map((p) => p.id)
+      : Array.from(selectedKeys as Set<string>);
+
+  const selectedCount = selectedIds.length;
+
+  // Single Delete Mutation
   const deleteMutation = useMutation({
-    mutationFn: async (productId: string) => {
-      const res = await actions.product.delete(productId);
+    mutationFn: async (id: string) => {
+      const res = await actions.product.delete(id);
       if (!res.ok) throw new Error(res.error || "Failed to delete product");
-      return productId;
+      return id;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-products"] });
@@ -98,320 +117,150 @@ export function ProductsView() {
     },
     onError: (err: any) => {
       toast("Error", {
-        description: err.message || "Could not delete product",
+        description: err.message || "Failed to delete product",
         variant: "danger",
       });
     },
   });
 
-  const { data, isLoading, isFetching } = useQuery({
-    queryKey: ["admin-products", page, PAGE_SIZE, search],
-    queryFn: async () => {
-      const res = await actions.product.list({
-        page,
-        limit: PAGE_SIZE,
-        search: search.trim() || undefined,
-      });
-      if (!res.ok) {
-        return {
-          products: [],
-          pagination: { page: 1, limit: PAGE_SIZE, total: 0, totalPages: 1 },
-        };
-      }
-      return {
-        products: res.products.map((p) => ({
-          ...p,
-          images: p.media.map((m) => m.url),
-          inventoryQty: p.inventoryQuantity,
-        })),
-        pagination: res.pagination,
-      };
+  // Bulk Delete Mutation
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const res = await actions.product.bulkDelete(ids);
+      if (!res.ok) throw new Error(res.error || "Failed to delete products");
+      return ids;
     },
-    staleTime: 30_000,
-    placeholderData: keepPreviousData,
+    onSuccess: (ids) => {
+      queryClient.invalidateQueries({ queryKey: ["admin-products"] });
+      setSelectedKeys(new Set());
+      toast("Success", {
+        description: `Successfully deleted ${ids.length} product${ids.length > 1 ? "s" : ""}`,
+        variant: "success",
+      });
+    },
+    onError: (err: any) => {
+      toast("Error", {
+        description: err.message || "Failed to delete selected products",
+        variant: "danger",
+      });
+    },
   });
 
-  const products = (data?.products ?? []) as unknown as Product[];
-  const totalProducts = data?.pagination?.total ?? 0;
-  const totalPages = Math.max(1, data?.pagination?.totalPages ?? 1);
-  const safePage = Math.min(page, totalPages);
+  // Toggle Status Mutation
+  const toggleStatusMutation = useMutation({
+    mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
+      const res = await actions.product.toggleStatus(id, "isActive");
+      if (!res.ok) throw new Error(res.error || "Failed to toggle status");
+      return res;
+    },
+    onMutate: async () => {
+      const toastId = toast("Updating status...", { isLoading: true });
+      return { toastId };
+    },
+    onSuccess: (_data, _variables, context) => {
+      if (context?.toastId) {
+        toast.update(context.toastId, "Success", {
+          description: "Product status updated successfully",
+          variant: "success",
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ["admin-products"] });
+    },
+    onError: (err: any, _variables, context) => {
+      if (context?.toastId) {
+        toast.update(context.toastId, "Error", {
+          description: err.message || "Failed to toggle status",
+          variant: "danger",
+        });
+      } else {
+        toast("Error", {
+          description: err.message || "Failed to toggle status",
+          variant: "danger",
+        });
+      }
+    },
+    onSettled: (_data, _error, variables) => {
+      if (variables?.id) {
+        setTogglingId((prev) => prev.filter((id) => id !== variables.id));
+      }
+    },
+  });
 
-  useEffect(() => {
-    if (page > totalPages) {
-      setPage(totalPages);
-    }
-  }, [page, totalPages]);
+  // Action Handlers
+  const handleOpenEdit = (product: ProductItem) => {
+    router.push(`/admin/products/new?edit=${product.id}`);
+  };
+
+  const handleCopyLink = (product: ProductItem) => {
+    const url = `${window.location.origin}/products/${product.slug}`;
+    navigator.clipboard.writeText(url);
+    toast("Copied", {
+      description: `Product link copied to clipboard`,
+      variant: "success",
+    });
+  };
+
+  const handleOpenDelete = async (product: ProductItem) => {
+    await confirm({
+      title: "Delete Product",
+      description: `Are you sure you want to permanently delete "${product.name}"? This action cannot be undone.`,
+      isDanger: true,
+      onConfirm: async () => {
+        await deleteMutation.mutateAsync(product.id);
+      },
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+    await confirm({
+      title: "Delete Selected Products",
+      description: `Are you sure you want to permanently delete ${selectedIds.length} selected product${selectedIds.length > 1 ? "s" : ""}? This action cannot be undone.`,
+      isDanger: true,
+      onConfirm: async () => {
+        await bulkDeleteMutation.mutateAsync(selectedIds);
+      },
+    });
+  };
+
+  const handleToggleStatus = (id: string, isActive: boolean) => {
+    setTogglingId((prev) => (prev.includes(id) ? prev : [...prev, id]));
+    toggleStatusMutation.mutate({ id, isActive });
+  };
 
   return (
     <Content>
-      <div className="mb-6 rounded-2xl border border-ap-border bg-ap-surface px-4 py-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="inline-flex items-center gap-2.5 text-ap-foreground">
-            <Boxes size={18} className="text-ap-muted" />
-            <h1 className="text-[22px] leading-none font-bold">Products</h1>
-          </div>
+      {/* Page Header */}
+      <ProductsHeader />
 
-          <Link
-            href="/admin/products/new"
-            className="inline-flex items-center gap-1.5 rounded-xl bg-ap-accent px-3 py-1.5 text-xs font-semibold text-ap-accent-foreground hover:opacity-90 transition-opacity"
-          >
-            <Plus size={14} />
-            Add Product
-          </Link>
-        </div>
-      </div>
+      {/* Toolbar / Search & Actions */}
+      <ProductsToolbar
+        searchInput={searchInput}
+        onSearchChange={handleSearchChange}
+        selectedCount={selectedCount}
+        isDeleting={bulkDeleteMutation.isPending}
+        onBulkDelete={handleBulkDelete}
+      />
 
-      {isLoading ? (
-        <div className="flex h-44 items-center justify-center rounded-2xl border border-ap-border bg-ap-surface">
-          <div className="flex items-center gap-2 text-sm text-ap-muted">
-            <Spinner size="sm" className="text-ap-accent" />
-            Loading products...
-          </div>
-        </div>
-      ) : totalProducts === 0 ? (
-        <div className="rounded-3xl border border-ap-border bg-ap-surface p-6 sm:p-8">
-          <div className="mx-auto max-w-lg text-center">
-            <div className="mx-auto mb-4 grid h-14 w-14 place-content-center rounded-2xl bg-ap-accent/10 text-ap-accent">
-              <Package size={26} />
-            </div>
-
-            <h2 className="text-lg font-semibold text-ap-foreground">
-              No products found
-            </h2>
-            <p className="mt-2 text-sm text-ap-muted">
-              Get started by adding your first product to your catalog. You can
-              manage prices, inventory, variations, and categories right here.
-            </p>
-
-            <div className="mt-5 flex justify-center">
-              <Link
-                href="/admin/products/new"
-                className="inline-flex items-center gap-2 rounded-xl bg-ap-accent px-4 py-2.5 text-sm font-semibold text-ap-accent-foreground transition-opacity hover:opacity-90"
-              >
-                <Plus size={15} />
-                Add First Product
-              </Link>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="overflow-hidden rounded-2xl border border-ap-border bg-ap-surface">
-          {isFetching && (
-            <div className="flex items-center gap-2 border-b border-ap-border bg-ap-field-background/60 px-4 py-2 text-xs text-ap-muted">
-              <Spinner size="sm" className="text-ap-accent" />
-              Refreshing...
-            </div>
-          )}
-          <div className="overflow-x-auto scrollbar-styled">
-            <table className="w-full min-w-245 border-collapse">
-              <thead>
-                <tr className="border-b border-ap-border bg-ap-field-background/50">
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-ap-muted">
-                    Product
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-ap-muted">
-                    Status
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-ap-muted">
-                    Stock
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-ap-muted">
-                    Price
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-ap-muted">
-                    Cost & Margin
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-ap-muted">
-                    Category
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-ap-muted">
-                    Updated
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-ap-muted">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-
-              <tbody className={isFetching ? "opacity-70" : "opacity-100"}>
-                {products.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="px-4 py-10 text-center">
-                      <p className="text-sm font-medium text-ap-foreground">
-                        No products on this page
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => setPage(1)}
-                        className="mt-3 inline-flex items-center rounded-lg border border-ap-border px-3 py-1.5 text-xs font-semibold text-ap-foreground transition-colors hover:bg-ap-field-background"
-                      >
-                        Go to First Page
-                      </button>
-                    </td>
-                  </tr>
-                ) : (
-                  products.map((product) => {
-                    const image = product.images?.[0];
-                    const inventory = getInventoryLabel(product);
-                    const hasCost = product.costPrice != null;
-                    const marginAmount = hasCost
-                      ? product.price - Number(product.costPrice)
-                      : null;
-                    const marginPercent =
-                      hasCost && product.price > 0
-                        ? (marginAmount! / product.price) * 100
-                        : null;
-
-                    return (
-                      <tr
-                        key={product.id}
-                        className="border-b border-ap-border/60 hover:bg-ap-field-background/40 transition-colors"
-                      >
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-3">
-                            <div className="h-11 w-11 overflow-hidden rounded-xl border border-ap-border bg-ap-field-background">
-                              {image ? (
-                                <img
-                                  src={image}
-                                  alt={product.name}
-                                  className="h-full w-full object-cover"
-                                />
-                              ) : (
-                                <div className="grid h-full w-full place-content-center text-ap-muted">
-                                  <Box size={16} />
-                                </div>
-                              )}
-                            </div>
-                            <div>
-                              <p className="max-w-70 truncate text-sm font-semibold text-ap-foreground">
-                                {product.name}
-                              </p>
-                              <p className="max-w-70 truncate text-xs text-ap-muted">
-                                {product.category?.name || "Uncategorized"}
-                              </p>
-                            </div>
-                          </div>
-                        </td>
-
-                        <td className="px-4 py-3">
-                          <span
-                            className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${
-                              product.inStock
-                                ? "bg-ap-success/10 text-ap-success"
-                                : "bg-ap-muted/15 text-ap-muted"
-                            }`}
-                          >
-                            {product.inStock ? "Active" : "Draft"}
-                          </span>
-                        </td>
-
-                        <td className="px-4 py-3 text-sm">
-                          <span className={inventory.tone}>
-                            {inventory.text}
-                          </span>
-                        </td>
-
-                        <td className="px-4 py-3 text-sm font-semibold text-ap-foreground">
-                          {formatMoney(product.price)}
-                        </td>
-
-                        <td className="px-4 py-3 text-sm">
-                          <p className="text-ap-foreground">
-                            {hasCost ? formatMoney(product.costPrice) : "—"}
-                          </p>
-                          <p className="text-xs text-ap-muted">
-                            {marginAmount == null || marginPercent == null
-                              ? "No cost"
-                              : `${formatMoney(marginAmount)} (${marginPercent.toFixed(1)}%)`}
-                          </p>
-                        </td>
-
-                        <td className="px-4 py-3 text-sm text-ap-foreground">
-                          {product.category?.name || "—"}
-                        </td>
-
-                        <td className="px-4 py-3 text-sm text-ap-muted">
-                          {formatDate(product.updatedAt || product.createdAt)}
-                        </td>
-
-                        <td className="px-4 py-3 text-right">
-                          <div className="inline-flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                router.push(
-                                  `/admin/products/new?edit=${product.id}`,
-                                )
-                              }
-                              aria-label="Edit product"
-                              title="Edit"
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-ap-border/80 bg-ap-field-background text-ap-muted transition-all hover:border-ap-accent/50 hover:bg-ap-accent/10 hover:text-ap-accent focus:outline-none focus:ring-2 focus:ring-ap-accent-soft"
-                            >
-                              <Pencil size={14} />
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                await confirm({
-                                  title: "Delete Product",
-                                  description: `Are you sure you want to permanently delete "${product.name}"?`,
-                                  isDanger: true,
-                                  onConfirm: async () => {
-                                    await deleteMutation.mutateAsync(
-                                      product.id,
-                                    );
-                                  },
-                                });
-                              }}
-                              aria-label="Delete product"
-                              title="Delete"
-                              disabled={deleteMutation.isPending}
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-ap-border/80 bg-ap-field-background text-ap-muted transition-all hover:border-ap-danger/40 hover:bg-ap-danger/10 hover:text-ap-danger focus:outline-none focus:ring-2 focus:ring-ap-danger-soft-hover disabled:opacity-50"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-end gap-3 border-t border-ap-border p-3">
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={safePage <= 1 || isFetching}
-                className="inline-flex items-center gap-1 rounded-lg border border-ap-border px-2.5 py-1.5 text-xs font-medium text-ap-foreground disabled:cursor-not-allowed disabled:opacity-50 hover:bg-ap-field-background transition-colors"
-              >
-                <ChevronLeft size={14} /> Previous
-              </button>
-
-              <span className="text-xs text-ap-muted">
-                Page {safePage} of {totalPages}
-              </span>
-
-              <button
-                type="button"
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={
-                  safePage >= totalPages ||
-                  products.length < PAGE_SIZE ||
-                  isFetching
-                }
-                className="inline-flex items-center gap-1 rounded-lg border border-ap-border px-2.5 py-1.5 text-xs font-medium text-ap-foreground disabled:cursor-not-allowed disabled:opacity-50 hover:bg-ap-field-background transition-colors"
-              >
-                Next <ChevronRight size={14} />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* HeroUI Table & Pagination */}
+      <ProductsTable
+        products={products}
+        totalProducts={totalProducts}
+        totalPages={totalPages}
+        page={page}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={handlePageSizeChange}
+        isLoading={isLoading}
+        debouncedSearch={debouncedSearch}
+        selectedKeys={selectedKeys}
+        onSelectionChange={setSelectedKeys}
+        togglingId={togglingId}
+        onToggleStatus={handleToggleStatus}
+        onEditProduct={handleOpenEdit}
+        onDeleteProduct={handleOpenDelete}
+        onCopyLink={handleCopyLink}
+      />
     </Content>
   );
 }

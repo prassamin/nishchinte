@@ -7,6 +7,7 @@ import {
   rename as fsRename,
   readFile,
   access,
+  rm,
 } from "fs/promises";
 import path from "path";
 import { getMimeType } from "../mime";
@@ -116,13 +117,16 @@ export function localStorage(config?: LocalStorageConfig): StoragePlugin {
     },
 
     /**
-     * Deletes a single file from disk.
+     * Deletes a single file or directory from disk.
      */
     async delete(filePath: string): Promise<boolean> {
       if (!filePath) return false;
-      const fullPath = getLocalDiskPath(filePath);
+      const clean = cleanPath(filePath);
+      if (!clean) return false;
+      const fullPath = getLocalDiskPath(clean);
       try {
-        await unlink(fullPath);
+        await access(fullPath);
+        await rm(fullPath, { recursive: true, force: true });
         return true;
       } catch {
         return false;

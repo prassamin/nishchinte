@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Spinner } from "@heroui/react";
 
 import Content from "../../components/content";
 
-import { useContentManager } from "./use-content-manager";
+import { ContentManagerProvider, useContent } from "./use-content-manager";
 import { ContentBreadcrumbs } from "./components/content-breadcrumbs";
 import { ContentToolbar } from "./components/content-toolbar";
 import { ContentTree } from "./components/content-tree";
@@ -14,55 +14,20 @@ import { CreateFolderModal } from "./components/create-folder-modal";
 import { MediaViewer } from "./components/media-viewer";
 import { UploadProgressPanel } from "../../components/upload-progress-panel";
 
-import type { ContentItem } from "./types";
-
-type Props = {
-  dashboardSlug?: string;
-};
-
-export function ContentManagerView({}: Props = {}) {
+function ContentManagerViewInner() {
   const {
     currentPath,
     rootPath,
-    parentPath,
-    search,
-    sortKey,
-    sortDirection,
-    selectedPaths,
-    items,
-    folderTree,
     expandedPaths,
-    loadingTreePaths,
-    isFetching,
     errorMessage,
-    openFolder,
-    goToPath,
-    toggleSelect,
-    createFolder,
+    toggleExpandPath,
     isCreatingFolder,
-    isUploading,
+    isDeleting,
     uploadQueue,
     clearUploadQueue,
-    deletePaths,
-    isDeleting,
-    toggleExpandPath,
-    setSearch,
-    setSortKey,
-    setSortDirection,
-    reloadCurrent,
-    uploadFiles,
-    selectAllVisible,
-    clearSelection,
-    deleteSelected,
-    goUp,
-  } = useContentManager();
+  } = useContent();
 
-  const root = rootPath || "media";
-  const [isCreateFolderOpen, setCreateFolderOpen] = useState(false);
-  const [folderName, setFolderName] = useState("");
-  const [isSubmittingFolder, setSubmittingFolder] = useState(false);
-  const [isMediaViewerOpen, setMediaViewerOpen] = useState(false);
-  const [mediaViewerIndex, setMediaViewerIndex] = useState(0);
+  const root = rootPath || "/";
 
   useEffect(() => {
     if (!root) return;
@@ -70,45 +35,7 @@ export function ContentManagerView({}: Props = {}) {
     void toggleExpandPath(root);
   }, [root, expandedPaths, toggleExpandPath]);
 
-  const handleCloseFolderModal = () => {
-    if (isCreatingFolder || isSubmittingFolder) return;
-    setCreateFolderOpen(false);
-    setFolderName("");
-  };
-
-  const handleCreateFolder = async () => {
-    const nextName = folderName.trim();
-    if (!nextName || isSubmittingFolder) return;
-
-    setSubmittingFolder(true);
-
-    try {
-      await createFolder(nextName);
-      handleCloseFolderModal();
-    } catch {
-      // Keep modal open on failure.
-    } finally {
-      setSubmittingFolder(false);
-    }
-  };
-
-  const handlePreviewMedia = (item: ContentItem) => {
-    // Find index among media items
-    const mediaItems = items.filter(
-      (i) =>
-        i.kind === "file" &&
-        (i.mimeType?.startsWith("image/") ||
-          i.mimeType?.startsWith("video/") ||
-          i.mimeType?.startsWith("audio/")),
-    );
-    const index = mediaItems.findIndex((i) => i.path === item.path);
-    if (index >= 0) {
-      setMediaViewerIndex(index);
-      setMediaViewerOpen(true);
-    }
-  };
-
-  if (!currentPath && isFetching) {
+  if (!currentPath) {
     return (
       <Content className="grid place-items-center">
         <Spinner className="text-ap-accent" />
@@ -121,32 +48,11 @@ export function ContentManagerView({}: Props = {}) {
       <div className="flex flex-col h-full rounded-2xl border border-ap-border/50 bg-linear-to-b from-ap-background to-ap-surface/20 overflow-auto shadow-xl shadow-black/5">
         {/* Header with Breadcrumbs */}
         <div className="border-b border-ap-border/50 bg-ap-surface/30 px-4 py-3">
-          <ContentBreadcrumbs
-            path={currentPath}
-            rootPath={root}
-            onNavigate={(path) => goToPath(path || root)}
-          />
+          <ContentBreadcrumbs />
         </div>
 
         {/* Toolbar */}
-        <ContentToolbar
-          onCreateFolder={() => setCreateFolderOpen(true)}
-          onUploadFiles={uploadFiles}
-          onReload={reloadCurrent}
-          onSearchChange={setSearch}
-          onSortKeyChange={setSortKey}
-          onSortDirectionChange={setSortDirection}
-          onDeleteSelected={deleteSelected}
-          onGoUp={goUp}
-          search={search}
-          sortKey={sortKey}
-          sortDirection={sortDirection}
-          isFetching={isFetching}
-          isUploading={isUploading}
-          isDeleting={isDeleting}
-          selectedCount={selectedPaths.size}
-          canGoUp={Boolean(parentPath)}
-        />
+        <ContentToolbar />
 
         {/* Error Message */}
         {errorMessage ? (
@@ -159,48 +65,18 @@ export function ContentManagerView({}: Props = {}) {
         {/* Main Content Area */}
         <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] flex-1 min-h-0">
           {/* Sidebar */}
-          <ContentTree
-            rootPath={root}
-            currentPath={currentPath}
-            folderTree={folderTree}
-            expandedPaths={expandedPaths}
-            loadingTreePaths={loadingTreePaths}
-            onNavigate={goToPath}
-            onToggleExpand={toggleExpandPath}
-          />
+          <ContentTree />
 
           {/* Content Grid */}
-          <ContentGrid
-            items={items}
-            selectedPaths={selectedPaths}
-            onToggleSelect={toggleSelect}
-            onOpenFolder={openFolder}
-            onDeleteItem={(path) => deletePaths([path])}
-            onSelectAll={selectAllVisible}
-            onClearSelection={clearSelection}
-            onPreview={handlePreviewMedia}
-          />
+          <ContentGrid />
         </div>
       </div>
 
       {/* Create Folder Modal */}
-      <CreateFolderModal
-        isOpen={isCreateFolderOpen}
-        onClose={handleCloseFolderModal}
-        folderName={folderName}
-        onFolderNameChange={setFolderName}
-        onSubmit={handleCreateFolder}
-        isSubmitting={isCreatingFolder || isSubmittingFolder}
-      />
+      <CreateFolderModal />
 
       {/* Media Viewer */}
-      <MediaViewer
-        isOpen={isMediaViewerOpen}
-        onClose={() => setMediaViewerOpen(false)}
-        items={items}
-        initialIndex={mediaViewerIndex}
-        onDeleteItem={(path) => deletePaths([path])}
-      />
+      <MediaViewer />
 
       {/* Processing Indicator (folder/delete only) */}
       {(isCreatingFolder || isDeleting) && (
@@ -228,12 +104,10 @@ export function ContentManagerView({}: Props = {}) {
           </div>
           <div className="flex flex-col gap-0.5">
             <span className="font-medium text-ap-foreground text-[13px] leading-tight">
-              {isCreatingFolder
-                ? "ফোল্ডার তৈরি হচ্ছে..."
-                : "আইটেম মুছে ফেলা হচ্ছে..."}
+              {isCreatingFolder ? "Creating folder..." : "Deleting item(s)..."}
             </span>
             <span className="text-[11px] text-ap-muted/80 leading-tight">
-              অনুগ্রহ করে অপেক্ষা করুন
+              Please wait...
             </span>
           </div>
         </div>
@@ -242,5 +116,13 @@ export function ContentManagerView({}: Props = {}) {
       {/* Upload Progress Panel (Fixed bottom-right with Framer Motion) */}
       <UploadProgressPanel queue={uploadQueue} onClear={clearUploadQueue} />
     </Content>
+  );
+}
+
+export function ContentManagerView() {
+  return (
+    <ContentManagerProvider>
+      <ContentManagerViewInner />
+    </ContentManagerProvider>
   );
 }

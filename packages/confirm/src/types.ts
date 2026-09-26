@@ -3,9 +3,9 @@ export interface ConfirmOptions {
   title: string;
   /** Detailed description or confirmation message */
   description: string;
-  /** Primary button text (default: "নিশ্চিত করুন") */
+  /** Primary button text (default: "Confirm") */
   confirmText?: string;
-  /** Cancel button text (default: "বাতিল") */
+  /** Cancel button text (default: "Cancel") */
   cancelText?: string;
   /** Whether the action is destructive (shows red alert styling) */
   isDanger?: boolean;

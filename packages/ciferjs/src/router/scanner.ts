@@ -114,6 +114,13 @@ export async function createAutoRouter(options: CiferOptions = {}): Promise<Hono
 
                 // If handler returned a standard Web Response or CiferResponse
                 if (result instanceof Response) {
+                  c.res.headers.forEach((value, key) => {
+                    if (key.toLowerCase() === "set-cookie") {
+                      result.headers.append(key, value);
+                    } else if (!result.headers.has(key)) {
+                      result.headers.set(key, value);
+                    }
+                  });
                   return result;
                 }
 

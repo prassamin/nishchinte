@@ -2,84 +2,66 @@ import { ChevronRight, Folder, HardDrive, Loader2 } from "lucide-react";
 
 import type { ContentItem } from "../types";
 import { cn } from "@heroui/react";
+import { normalizePath, useContent } from "../use-content-manager";
 
-type Props = {
-  rootPath: string;
-  currentPath: string;
-  folderTree: Record<string, ContentItem[]>;
-  expandedPaths: Set<string>;
-  loadingTreePaths: Set<string>;
-  onNavigate: (path: string) => void;
-  onToggleExpand: (path: string) => void;
-};
-
-export function ContentTree({
-  rootPath,
-  currentPath,
-  folderTree,
-  expandedPaths,
-  loadingTreePaths,
-  onNavigate,
-  onToggleExpand,
-}: Props) {
-  const rootChildren = folderTree[rootPath] ?? [];
+export function ContentTree() {
+  const {
+    currentPath,
+    rootPath,
+    folderTree,
+    expandedPaths,
+    loadingTreePaths,
+    goToPath: onNavigate,
+  } = useContent();
+  const normRoot = normalizePath(rootPath);
+  const normCurrent = normalizePath(currentPath);
+  const rootChildren = folderTree[normRoot] ?? folderTree[rootPath] ?? [];
 
   const renderNode = (node: ContentItem, depth: number) => {
-    const isExpanded = expandedPaths.has(node.path);
-    const children = folderTree[node.path] ?? [];
-    const isLoading = loadingTreePaths.has(node.path);
-    const isActive = node.path === currentPath;
+    const nodePath = normalizePath(node.path);
+    const isExpanded = expandedPaths.has(nodePath);
+    const isLoading = loadingTreePaths.has(nodePath);
+    const children = folderTree[nodePath] ?? folderTree[node.path] ?? [];
+    const isActive = nodePath === normCurrent;
 
     return (
-      <div key={node.path}>
-        <div
+      <div key={nodePath}>
+        <button
+          type="button"
+          onClick={() => onNavigate(nodePath)}
           className={cn(
-            "group flex items-center rounded-lg transition-colors",
+            "group flex w-full items-center gap-2 rounded-lg py-1 px-2 text-left transition-colors",
             isActive
               ? "bg-ap-accent/10 text-ap-accent"
               : "text-ap-muted hover:bg-ap-surface/50 hover:text-ap-foreground",
           )}
-          style={{ paddingLeft: `${8 + depth * 16}px` }}
+          style={{ paddingLeft: `${8 + depth * 12}px` }}
+          title={nodePath}
         >
-          <button
-            type="button"
-            onClick={() => void onToggleExpand(node.path)}
-            className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-ap-muted hover:bg-ap-surface/50 transition-colors"
-            aria-label={isExpanded ? "Collapse" : "Expand"}
-          >
+          {isLoading ? (
+            <Loader2
+              size={13}
+              className="shrink-0 animate-spin text-ap-accent"
+            />
+          ) : (
             <ChevronRight
-              size={14}
+              size={13}
               className={cn(
-                "transition-transform duration-200",
+                "shrink-0 transition-transform duration-200 text-ap-muted/70 group-hover:text-ap-foreground",
                 isExpanded ? "rotate-90" : "rotate-0",
               )}
             />
-          </button>
+          )}
 
-          <button
-            type="button"
-            onClick={() => onNavigate(node.path)}
-            className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-lg px-2 text-left text-sm"
-            title={node.path}
-          >
-            <Folder size={15} className="shrink-0" />
-            <span className="truncate font-medium">{node.name}</span>
-          </button>
-        </div>
+          <Folder size={15} className="shrink-0" />
+          <span className="truncate text-sm font-medium flex-1">
+            {node.name}
+          </span>
+        </button>
 
         {isExpanded ? (
           <div className="border-l border-ap-border/30 ml-4">
-            {isLoading ? (
-              <div
-                className="inline-flex items-center gap-2 px-3 py-2 text-xs text-ap-muted"
-                style={{ paddingLeft: `${32 + depth * 16}px` }}
-              >
-                <Loader2 size={12} className="animate-spin" />
-                Loading...
-              </div>
-            ) : null}
-
-            {!isLoading && children.length > 0
+            {children.length > 0
               ? children.map((child) => renderNode(child, depth + 1))
               : null}
           </div>
@@ -95,50 +77,39 @@ export function ContentTree({
           Folder Tree
         </div>
 
-        <div
+        <button
+          type="button"
+          onClick={() => onNavigate(normRoot)}
           className={cn(
-            "group flex items-center rounded-lg transition-colors",
-            currentPath === rootPath
+            "group flex w-full items-center gap-2 rounded-lg py-1 px-2 text-left transition-colors",
+            normCurrent === normRoot
               ? "bg-ap-accent/10 text-ap-accent"
               : "text-ap-muted hover:bg-ap-surface/50 hover:text-ap-foreground",
           )}
+          title="Root"
         >
-          <button
-            type="button"
-            onClick={() => void onToggleExpand(rootPath)}
-            className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-ap-muted transition-colors"
-            aria-label={expandedPaths.has(rootPath) ? "Collapse" : "Expand"}
-          >
+          {loadingTreePaths.has(normRoot) ? (
+            <Loader2
+              size={13}
+              className="shrink-0 animate-spin text-ap-accent"
+            />
+          ) : (
             <ChevronRight
-              size={14}
+              size={13}
               className={cn(
-                "transition-transform duration-200",
-                expandedPaths.has(rootPath) ? "rotate-90" : "rotate-0",
+                "shrink-0 transition-transform duration-200 text-ap-muted/70 group-hover:text-ap-foreground",
+                expandedPaths.has(normRoot) ? "rotate-90" : "rotate-0",
               )}
             />
-          </button>
+          )}
 
-          <button
-            type="button"
-            onClick={() => onNavigate(rootPath)}
-            className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-lg px-2 text-left text-sm"
-            title={rootPath}
-          >
-            <HardDrive size={15} className="shrink-0" />
-            <span className="truncate font-medium">Root</span>
-          </button>
-        </div>
+          <HardDrive size={15} className="shrink-0" />
+          <span className="truncate text-sm font-medium flex-1">Root</span>
+        </button>
 
-        {expandedPaths.has(rootPath) ? (
+        {expandedPaths.has(normRoot) ? (
           <div className="mt-1">
-            {loadingTreePaths.has(rootPath) ? (
-              <div className="inline-flex items-center gap-2 px-3 py-2 text-xs text-ap-muted">
-                <Loader2 size={12} className="animate-spin" />
-                Loading...
-              </div>
-            ) : null}
-
-            {!loadingTreePaths.has(rootPath) && rootChildren.length > 0
+            {rootChildren.length > 0
               ? rootChildren.map((node) => renderNode(node, 1))
               : null}
           </div>

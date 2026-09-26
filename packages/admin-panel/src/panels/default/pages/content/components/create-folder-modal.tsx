@@ -1,26 +1,27 @@
 "use client";
 
 import { FolderPlus } from "lucide-react";
-import { Button, Modal } from "@heroui/react";
-import { Spinner } from "@heroui/react";
+import { Button, Modal, Spinner } from "@heroui/react";
+import { useContent } from "../use-content-manager";
 
 type Props = {
-  isOpen: boolean;
-  onClose: () => void;
-  folderName: string;
-  onFolderNameChange: (value: string) => void;
-  onSubmit: () => void;
+  isOpen?: boolean;
+  onClose?: () => void;
+  folderName?: string;
+  onFolderNameChange?: (value: string) => void;
+  onSubmit?: () => void;
   isSubmitting?: boolean;
 };
 
-export function CreateFolderModal({
-  isOpen,
-  onClose,
-  folderName,
-  onFolderNameChange,
-  onSubmit,
-  isSubmitting,
-}: Props) {
+export function CreateFolderModal(props: Props = {}) {
+  const content = useContent();
+  const isOpen = props.isOpen ?? content.isCreateFolderOpen;
+  const onClose = props.onClose ?? content.handleCloseFolderModal;
+  const folderName = props.folderName ?? content.folderName;
+  const onFolderNameChange = props.onFolderNameChange ?? content.setFolderName;
+  const onSubmit = props.onSubmit ?? content.handleCreateFolder;
+  const isSubmitting =
+    props.isSubmitting ?? (content.isCreatingFolder || content.isSubmittingFolder);
   return (
     <Modal>
       <Modal.Backdrop

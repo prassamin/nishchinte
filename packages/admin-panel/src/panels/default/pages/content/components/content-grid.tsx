@@ -11,42 +11,31 @@ import {
 } from "lucide-react";
 
 import type { ContentItem } from "../types";
-import { Checkbox, Dropdown, Header, Label, cn, toast } from "@heroui/react";
+import {
+  Checkbox,
+  Dropdown,
+  Header,
+  Label,
+  Skeleton,
+  cn,
+  toast,
+} from "@heroui/react";
 import { useLayoutEffect, useRef, useState } from "react";
 
 import { useConfirm } from "@nishchinte/confirm";
+import {
+  isAudioMime,
+  isImageMime,
+  isMediaItem,
+  isVideoMime,
+  useContent,
+} from "../use-content-manager";
+
+export { isAudioMime, isImageMime, isMediaItem, isVideoMime };
 
 type Props = {
-  items: ContentItem[];
-  selectedPaths: Set<string>;
-  onToggleSelect: (path: string) => void;
-  onOpenFolder: (item: ContentItem) => void;
-  onDeleteItem: (path: string) => void;
-  onSelectAll: () => void;
-  onClearSelection?: () => void;
-  onPreview: (item: ContentItem) => void;
+  onPreview?: (item: ContentItem) => void;
 };
-
-export function isImageMime(mime?: string | null) {
-  return Boolean(mime && mime.startsWith("image/"));
-}
-
-export function isVideoMime(mime?: string | null) {
-  return Boolean(mime && mime.startsWith("video/"));
-}
-
-export function isAudioMime(mime?: string | null) {
-  return Boolean(mime && mime.startsWith("audio/"));
-}
-
-export function isMediaItem(item: ContentItem) {
-  return (
-    item.kind === "file" &&
-    (isImageMime(item.mimeType) ||
-      isVideoMime(item.mimeType) ||
-      isAudioMime(item.mimeType))
-  );
-}
 
 function formatSize(size?: number | null) {
   if (!size || size <= 0) return "—";
@@ -251,17 +240,151 @@ function RowActionsMenu({
   );
 }
 
-export function ContentGrid({
-  items,
-  selectedPaths,
-  onToggleSelect,
-  onOpenFolder,
-  onDeleteItem,
-  onSelectAll,
-  onClearSelection,
-  onPreview,
-}: Props) {
+function ContentGridSkeleton() {
+  const skeletonRows = [
+    {
+      nameWidth: "w-44",
+      typeWidth: "w-14",
+      sizeWidth: "w-8",
+      dateWidth: "w-28",
+    },
+    {
+      nameWidth: "w-52",
+      typeWidth: "w-14",
+      sizeWidth: "w-8",
+      dateWidth: "w-24",
+    },
+    {
+      nameWidth: "w-64",
+      typeWidth: "w-16",
+      sizeWidth: "w-14",
+      dateWidth: "w-32",
+    },
+    {
+      nameWidth: "w-36",
+      typeWidth: "w-12",
+      sizeWidth: "w-12",
+      dateWidth: "w-28",
+    },
+    {
+      nameWidth: "w-56",
+      typeWidth: "w-14",
+      sizeWidth: "w-16",
+      dateWidth: "w-24",
+    },
+    {
+      nameWidth: "w-32",
+      typeWidth: "w-10",
+      sizeWidth: "w-12",
+      dateWidth: "w-28",
+    },
+    {
+      nameWidth: "w-60",
+      typeWidth: "w-14",
+      sizeWidth: "w-14",
+      dateWidth: "w-32",
+    },
+    {
+      nameWidth: "w-40",
+      typeWidth: "w-12",
+      sizeWidth: "w-10",
+      dateWidth: "w-24",
+    },
+  ];
+
+  return (
+    <div className="overflow-x-auto scrollbar-styled animate-in fade-in duration-200">
+      <table className="w-full min-w-150">
+        <thead>
+          <tr className="border-b border-ap-border/50 bg-ap-surface/30">
+            <th className="w-12 px-4 py-3">
+              <div className="w-4 h-4 rounded-md bg-ap-border/40" />
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-ap-muted">
+              Name
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-ap-muted w-32">
+              Type
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-ap-muted w-24">
+              Size
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-ap-muted w-40">
+              Modified
+            </th>
+            <th className="w-12 px-4 py-3" />
+          </tr>
+        </thead>
+        <tbody>
+          {skeletonRows.map((row, idx) => (
+            <tr
+              key={idx}
+              className="border-b border-ap-border/30 last:border-0"
+            >
+              <td className="px-4 py-2.5">
+                <Skeleton className="w-4 h-4 rounded-md bg-ap-border/40" />
+              </td>
+              <td className="px-4 py-2.5">
+                <div className="flex items-center gap-3">
+                  <Skeleton className="w-8 h-8 rounded-lg shrink-0 bg-ap-surface/80 border border-ap-border/30" />
+                  <Skeleton
+                    className={cn(
+                      "h-4 rounded-md bg-ap-muted/20",
+                      row.nameWidth,
+                    )}
+                  />
+                </div>
+              </td>
+              <td className="px-4 py-2.5">
+                <Skeleton
+                  className={cn(
+                    "h-3.5 rounded-md bg-ap-muted/15",
+                    row.typeWidth,
+                  )}
+                />
+              </td>
+              <td className="px-4 py-2.5">
+                <Skeleton
+                  className={cn(
+                    "h-3.5 rounded-md bg-ap-muted/15",
+                    row.sizeWidth,
+                  )}
+                />
+              </td>
+              <td className="px-4 py-2.5">
+                <Skeleton
+                  className={cn(
+                    "h-3.5 rounded-md bg-ap-muted/15",
+                    row.dateWidth,
+                  )}
+                />
+              </td>
+              <td className="px-4 py-2.5">
+                <Skeleton className="w-7 h-7 rounded-lg bg-ap-border/30" />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export function ContentGrid({ onPreview: onPreviewProp }: Props = {}) {
   const { confirm } = useConfirm();
+  const {
+    selectedPaths,
+    items,
+    isFetching,
+    openFolder: onOpenFolder,
+    toggleSelect: onToggleSelect,
+    deletePaths: onDeleteItem,
+    selectAllVisible: onSelectAll,
+    clearSelection: onClearSelection,
+    openPreview,
+  } = useContent();
+
+  const handlePreview = onPreviewProp || openPreview;
   const allSelected =
     items.length > 0 && items.every((item) => selectedPaths.has(item.path));
   const someSelected = items.some((item) => selectedPaths.has(item.path));
@@ -282,15 +405,23 @@ export function ContentGrid({
     }
   };
 
+  if (isFetching) {
+    return <ContentGridSkeleton />;
+  }
+
   if (items.length === 0) {
     return (
-      <div className="flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 rounded-2xl bg-ap-surface/50 flex items-center justify-center mx-auto mb-4">
-            <File size={24} className="text-ap-muted/50" />
-          </div>
-          <p className="text-ap-muted text-sm">No files found in this folder</p>
+      <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
+        <div className="w-16 h-16 rounded-2xl bg-ap-surface/60 border border-ap-border/50 flex items-center justify-center mx-auto mb-4 shadow-sm">
+          <File size={24} className="text-ap-muted/50" />
         </div>
+        <h4 className="text-ap-foreground font-semibold text-[15px] mb-1.5">
+          No files in this folder
+        </h4>
+        <p className="text-ap-muted text-[13px] max-w-64">
+          Upload media files or create new folders to organize your store
+          content.
+        </p>
       </div>
     );
   }
@@ -341,7 +472,7 @@ export function ContentGrid({
                     return onOpenFolder(item);
                   }
                   if (isMediaItem(item)) {
-                    onPreview(item);
+                    handlePreview(item);
                   }
                 }}
                 className={`group border-b border-ap-border/30 last:border-0 transition-colors cursor-pointer ${
@@ -415,8 +546,8 @@ export function ContentGrid({
                 >
                   <RowActionsMenu
                     item={item}
-                    onPreview={onPreview}
-                    onDeleteItem={onDeleteItem}
+                    onPreview={handlePreview}
+                    onDeleteItem={(path) => onDeleteItem([path])}
                     confirm={confirm}
                   />
                 </td>
