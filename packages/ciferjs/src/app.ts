@@ -26,10 +26,21 @@ export function createCifer<TContext extends Record<string, any> = CiferContextM
       ? await (prodRouterPromise ??= createAutoRouter(options as any))
       : await createAutoRouter({ ...options, dev: true } as any);
 
+    const mergeHeaders = (targetRes: Response) => {
+      c.res.headers.forEach((value, key) => {
+        if (key.toLowerCase() === "set-cookie") {
+          targetRes.headers.append(key, value);
+        } else if (!targetRes.headers.has(key)) {
+          targetRes.headers.set(key, value);
+        }
+      });
+      return targetRes;
+    };
+
     // 1. Try with the raw incoming request
     const res = await router.fetch(c.req.raw);
     if (res.status !== 404) {
-      return res;
+      return mergeHeaders(res);
     }
 
     // 2. If 404 and URL pathname has /api prefix (e.g. mounted in Next.js /api), strip and retry
@@ -39,11 +50,11 @@ export function createCifer<TContext extends Record<string, any> = CiferContextM
       const strippedReq = new Request(url.toString(), c.req.raw);
       const retryRes = await router.fetch(strippedReq);
       if (retryRes.status !== 404) {
-        return retryRes;
+        return mergeHeaders(retryRes);
       }
     }
 
-    return res;
+    return mergeHeaders(res);
   });
 
   return app;

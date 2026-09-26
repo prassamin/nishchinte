@@ -2,6 +2,7 @@ import { prisma } from "@nishchinte/db";
 import { getConfig } from "@nishchinte/config";
 import { getAvatarSync } from "@nishchinte/utils";
 import { verifyJwt } from "../crypto/jwt";
+import { hashToken } from "../crypto/otp";
 import { getAdminSessionFromToken } from "../session/admin";
 import { rotateRefreshToken } from "../session/tokens";
 import {
@@ -177,8 +178,29 @@ export function createRequestAuth(reqOrCtx: any): RequestBoundAuth {
           adminRefreshToken = newTokens.refreshToken || adminRefreshToken;
         }
       } catch {
-        cachedAdminUser = null;
-        return null;
+        // Fallback: check if adminRefreshToken belongs to an active, valid session in DB
+        try {
+          const tokenHash = hashToken(adminRefreshToken);
+          const existingToken = await prisma.authRefreshToken.findUnique({
+            where: { tokenHash },
+            include: { session: true },
+          });
+          if (
+            existingToken &&
+            existingToken.session &&
+            !existingToken.session.isRevoked &&
+            new Date() <= existingToken.expiresAt
+          ) {
+            tokenPayload = {
+              id: existingToken.session.userId,
+              sessionId: existingToken.session.id,
+              type: "admin",
+            } as any;
+          }
+        } catch {
+          cachedAdminUser = null;
+          return null;
+        }
       }
     }
 
@@ -254,6 +276,57 @@ export function createRequestAuth(reqOrCtx: any): RequestBoundAuth {
           adminRefreshToken = newTokens.refreshToken || adminRefreshToken;
         }
       } catch {
+        // Fallback: check if session is still active in DB
+        try {
+          const tokenHash = hashToken(adminRefreshToken);
+          const existingToken = await prisma.authRefreshToken.findUnique({
+            where: { tokenHash },
+            include: { session: true },
+          });
+
+          if (
+            existingToken &&
+            existingToken.session &&
+            !existingToken.session.isRevoked &&
+            new Date() <= existingToken.expiresAt
+          ) {
+            const dbUser = await prisma.internalUser.findUnique({
+              where: { id: existingToken.session.userId },
+              select: {
+                id: true,
+                email: true,
+                name: true,
+                role: true,
+                avatarUrl: true,
+                permissions: true,
+                isActive: true,
+              },
+            });
+
+            if (dbUser && dbUser.isActive) {
+              const adminUserPayload: AdminSessionPayload = {
+                id: dbUser.id,
+                email: dbUser.email,
+                name: dbUser.name,
+                role: dbUser.role as InternalUserRole,
+                avatarUrl: dbUser.avatarUrl || getAvatarSync(dbUser),
+                permissions: (dbUser.permissions as string[]) || [],
+                sessionId: existingToken.session.id,
+                type: "admin",
+              };
+              return {
+                accessToken: adminToken || "",
+                refreshToken: adminRefreshToken || undefined,
+                expiresIn: 0,
+                expiresAt: Math.floor(Date.now() / 1000),
+                tokenType: "Bearer" as const,
+                user: adminUserPayload,
+              };
+            }
+          }
+        } catch {
+          // Fallback error ignored
+        }
         return null;
       }
     }
@@ -330,8 +403,25 @@ export function createRequestAuth(reqOrCtx: any): RequestBoundAuth {
           customerRefreshToken = newTokens.refreshToken || customerRefreshToken;
         }
       } catch {
-        cachedCustomerUser = null;
-        return null;
+        // Fallback: check if customerRefreshToken belongs to active valid session in DB
+        try {
+          const tokenHash = hashToken(customerRefreshToken);
+          const existingToken = await prisma.authRefreshToken.findUnique({
+            where: { tokenHash },
+            include: { session: true },
+          });
+          if (
+            existingToken &&
+            existingToken.session &&
+            !existingToken.session.isRevoked &&
+            new Date() <= existingToken.expiresAt
+          ) {
+            customerId = existingToken.session.userId;
+          }
+        } catch {
+          cachedCustomerUser = null;
+          return null;
+        }
       }
     }
 
@@ -405,6 +495,44 @@ export function createRequestAuth(reqOrCtx: any): RequestBoundAuth {
           customerRefreshToken = newTokens.refreshToken || customerRefreshToken;
         }
       } catch {
+        // Fallback: reconstruct session directly from active DB session
+        try {
+          const tokenHash = hashToken(customerRefreshToken);
+          const existingToken = await prisma.authRefreshToken.findUnique({
+            where: { tokenHash },
+            include: { session: true },
+          });
+
+          if (
+            existingToken &&
+            existingToken.session &&
+            !existingToken.session.isRevoked &&
+            new Date() <= existingToken.expiresAt
+          ) {
+            const customer = await prisma.customer.findUnique({
+              where: { id: existingToken.session.userId },
+              include: { identities: true },
+            });
+
+            if (
+              customer &&
+              customer.isActive &&
+              (!customer.bannedUntil || customer.bannedUntil <= new Date())
+            ) {
+              const user = formatSupabaseUser(customer);
+              return {
+                access_token: customerToken || "",
+                token_type: "bearer",
+                expires_in: 0,
+                expires_at: Math.floor(Date.now() / 1000),
+                refresh_token: customerRefreshToken || "",
+                user,
+              };
+            }
+          }
+        } catch {
+          // Fallback error ignored
+        }
         return null;
       }
     }

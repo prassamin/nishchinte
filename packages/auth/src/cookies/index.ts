@@ -60,8 +60,14 @@ export async function setAuthCookie(
     const serialized = serializeCookie(name, token, cookieOptions);
     if (typeof context.header === "function") {
       context.header("Set-Cookie", serialized, { append: true });
+    } else if (typeof context?.c?.header === "function") {
+      context.c.header("Set-Cookie", serialized, { append: true });
     } else if (typeof context?.res?.headers?.append === "function") {
       context.res.headers.append("Set-Cookie", serialized);
+    } else if (typeof context?.headers?.append === "function") {
+      context.headers.append("Set-Cookie", serialized);
+    } else if (typeof context?.append === "function") {
+      context.append("Set-Cookie", serialized);
     }
   }
 
@@ -110,8 +116,14 @@ export async function removeAuthCookie(
     });
     if (typeof context.header === "function") {
       context.header("Set-Cookie", serialized, { append: true });
+    } else if (typeof context?.c?.header === "function") {
+      context.c.header("Set-Cookie", serialized, { append: true });
     } else if (typeof context?.res?.headers?.append === "function") {
       context.res.headers.append("Set-Cookie", serialized);
+    } else if (typeof context?.headers?.append === "function") {
+      context.headers.append("Set-Cookie", serialized);
+    } else if (typeof context?.append === "function") {
+      context.append("Set-Cookie", serialized);
     }
   }
 
