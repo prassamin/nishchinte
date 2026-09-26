@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { Select, ListBox, ListBoxItem, cn } from "@heroui/react";
-import { FolderTree, Folder, CornerDownRight } from "lucide-react";
+import { Folder, CornerDownRight } from "lucide-react";
 import {
   buildCategoryTree,
   flattenCategoryTree,
@@ -69,9 +69,7 @@ export function CategoryParentSelect({
           <Select.Trigger
             className={cn(
               "flex! justify-between! items-center! px-3! py-2! border! border-ap-border! rounded-xl! shadow-sm! text-[14px]! transition-colors! outline-none! min-w-full! cursor-pointer! relative!",
-              isFocused
-                ? "ring-2! ring-ap-accent-soft! border-ap-accent!"
-                : "",
+              isFocused ? "ring-2! ring-ap-accent-soft! border-ap-accent!" : "",
             )}
           >
             <Select.Value className="text-ap-foreground/90 truncate text-xs sm:text-sm">
@@ -79,8 +77,8 @@ export function CategoryParentSelect({
                 if (!selectedCategory) {
                   return (
                     <span className="flex items-center gap-2 text-ap-foreground">
-                      <FolderTree size={14} className="text-ap-muted shrink-0" />
-                      <span className="truncate">None (Top-Level Category)</span>
+                      <Folder size={14} className="text-ap-muted shrink-0" />
+                      <span className="truncate font-medium">None</span>
                     </span>
                   );
                 }
@@ -97,25 +95,26 @@ export function CategoryParentSelect({
             </Select.Value>
             <Select.Indicator className="text-ap-muted shrink-0 ml-2" />
           </Select.Trigger>
-          <Select.Popover className="rounded-xl border border-ap-border bg-ap-surface shadow-xl max-h-80 overflow-y-auto">
-            <ListBox className="p-1 space-y-0.5">
+          <Select.Popover
+            className="rounded-xl border border-ap-border bg-ap-surface shadow-xl overflow-hidden max-h-70"
+            style={{ maxHeight: "280px" }}
+          >
+            <ListBox
+              className="p-1 space-y-0.5 max-h-65 overflow-y-auto scrollbar-styled outline-none"
+              style={{ maxHeight: "260px", overflowY: "auto" }}
+            >
               <ListBoxItem
                 id=""
-                textValue="None (Top-Level Category)"
-                className="rounded-lg py-2 px-2.5 transition-colors data-[hover=true]:bg-ap-accent/10 data-[hover=true]:text-ap-accent border-b border-ap-border/40 mb-1"
+                textValue="None"
+                className="rounded-lg py-1.5 px-2 transition-colors data-[hover=true]:bg-ap-accent/10 data-[hover=true]:text-ap-accent cursor-pointer"
               >
-                <div className="flex items-center gap-2.5">
-                  <span className="grid h-6 w-6 place-content-center rounded-md bg-ap-field-background text-ap-muted">
-                    <FolderTree size={14} />
+                <div className="flex items-center gap-2">
+                  <span className="flex items-center text-ap-muted shrink-0">
+                    <Folder size={14} />
                   </span>
-                  <div>
-                    <p className="text-xs font-semibold text-ap-foreground">
-                      None (Top-Level Category)
-                    </p>
-                    <p className="text-[11px] text-ap-muted">
-                      Create this category as a main top-level department
-                    </p>
-                  </div>
+                  <span className="truncate text-xs font-semibold text-ap-foreground">
+                    None
+                  </span>
                 </div>
               </ListBoxItem>
 
@@ -152,7 +151,7 @@ export function CategoryParentSelect({
                     </span>
 
                     {opt.depth > 0 && (
-                      <span className="ml-auto shrink-0 text-[10px] text-ap-muted/70 font-mono bg-ap-field-background/60 px-1.5 py-0.5 rounded border border-ap-border/40">
+                      <span className="ml-auto shrink-0 text-[10px] text-ap-muted/70 font-mono px-1.5 py-0.5 rounded">
                         /{opt.node.slug}
                       </span>
                     )}

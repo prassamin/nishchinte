@@ -86,6 +86,7 @@ function uploadFileWithProgress(
     formData.append("parentPath", path);
 
     xhr.open("POST", url, true);
+    xhr.withCredentials = true;
     xhr.send(formData);
   });
 }

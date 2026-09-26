@@ -18,21 +18,21 @@ import { Drawer, cn } from "@heroui/react";
 import { useState, useEffect, useCallback, useRef } from "react";
 
 import { useConfirm } from "@nishchinte/confirm";
-
 import type { ContentItem } from "../types";
 import {
   isImageMime,
   isAudioMime,
   isMediaItem,
   isVideoMime,
-} from "./content-grid";
+  useContent,
+} from "../use-content-manager";
 
 type Props = {
-  isOpen: boolean;
-  onClose: () => void;
-  items: ContentItem[];
-  initialIndex: number;
-  onDeleteItem: (path: string) => void;
+  isOpen?: boolean;
+  onClose?: () => void;
+  items?: ContentItem[];
+  initialIndex?: number;
+  onDeleteItem?: (path: string) => void;
 };
 
 function formatSize(size?: number | null) {
@@ -50,7 +50,7 @@ function formatSize(size?: number | null) {
 function formatDate(value?: string | null) {
   if (!value) return "—";
   try {
-    return new Date(value).toLocaleString("bn-BD", {
+    return new Date(value).toLocaleString("en-US", {
       year: "numeric",
       month: "short",
       day: "2-digit",
@@ -62,13 +62,14 @@ function formatDate(value?: string | null) {
   }
 }
 
-export function MediaViewer({
-  isOpen,
-  onClose,
-  items,
-  initialIndex,
-  onDeleteItem,
-}: Props) {
+export function MediaViewer(props: Props = {}) {
+  const content = useContent();
+  const isOpen = props.isOpen ?? content.isMediaViewerOpen;
+  const onClose = props.onClose ?? content.closePreview;
+  const items = props.items ?? content.items;
+  const initialIndex = props.initialIndex ?? content.mediaViewerIndex;
+  const onDeleteItem =
+    props.onDeleteItem ?? ((path: string) => content.deletePaths([path]));
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [isPlaying, setIsPlaying] = useState(true);
   const [isMuted, setIsMuted] = useState(false);
@@ -131,15 +132,16 @@ export function MediaViewer({
 
   const handleDelete = async () => {
     if (!currentItem) return;
-    const ok = await confirm({
-      title: "ফাইল মুছে ফেলুন",
-      description: `আপনি কি "${currentItem.name}" স্থায়ীভাবে মুছে ফেলতে চান?`,
+
+    await confirm({
+      title: "Delete File",
+      description: `Are you sure you want to permanently delete ${currentItem.name}?`,
       isDanger: true,
+      onConfirm() {
+        onDeleteItem(currentItem.path);
+        onClose();
+      },
     });
-    if (ok) {
-      onDeleteItem(currentItem.path);
-      onClose();
-    }
   };
 
   const togglePlay = () => {
@@ -253,9 +255,7 @@ export function MediaViewer({
                     className="text-ap-muted mt-0.5 shrink-0"
                   />
                   <div className="min-w-0">
-                    <p className="text-xs text-ap-muted/70 mb-0.5">
-                      যোগ করা হয়েছে
-                    </p>
+                    <p className="text-xs text-ap-muted/70 mb-0.5">Created</p>
                     <p className="text-sm text-ap-foreground font-medium">
                       {formatDate(currentItem.createdAt)}
                     </p>
@@ -264,9 +264,7 @@ export function MediaViewer({
                 <div className="flex items-start gap-2.5 p-3 rounded-xl bg-ap-surface/50 border border-ap-border/30">
                   <Clock size={16} className="text-ap-muted mt-0.5 shrink-0" />
                   <div className="min-w-0">
-                    <p className="text-xs text-ap-muted/70 mb-0.5">
-                      সর্বশেষ পরিবর্তন
-                    </p>
+                    <p className="text-xs text-ap-muted/70 mb-0.5">Modified</p>
                     <p className="text-sm text-ap-foreground font-medium">
                       {formatDate(
                         currentItem.updatedAt || currentItem.createdAt,
@@ -280,9 +278,7 @@ export function MediaViewer({
                     className="text-ap-muted mt-0.5 shrink-0"
                   />
                   <div className="min-w-0">
-                    <p className="text-xs text-ap-muted/70 mb-0.5">
-                      ফাইলের আকার
-                    </p>
+                    <p className="text-xs text-ap-muted/70 mb-0.5">Size</p>
                     <p className="text-sm text-ap-foreground font-medium">
                       {formatSize(currentItem.sizeBytes)}
                     </p>
@@ -298,7 +294,7 @@ export function MediaViewer({
                   className="inline-flex flex-1 items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-ap-foreground bg-ap-surface border border-ap-border/50 hover:bg-ap-surface/80 hover:border-ap-border hover:shadow-sm transition-all"
                 >
                   <Download size={16} />
-                  ডাউনলোড
+                  Download
                 </button>
                 <button
                   type="button"
@@ -311,7 +307,7 @@ export function MediaViewer({
                   )}
                 >
                   <Link size={16} />
-                  {copied ? "কপি হয়েছে" : "URL কপি করুন"}
+                  {copied ? "Copied" : "Copy URL"}
                 </button>
               </div>
 
@@ -322,7 +318,7 @@ export function MediaViewer({
                 className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-ap-danger bg-ap-danger-soft border border-ap-danger-soft hover:bg-ap-danger-soft-hover hover:border-ap-danger-soft-hover transition-all"
               >
                 <Trash2 size={16} />
-                ফাইল মুছুন
+                Delete
               </button>
             </Drawer.Body>
           </Drawer.Dialog>

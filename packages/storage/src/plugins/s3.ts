@@ -134,20 +134,48 @@ export function s3Storage(config: S3Config): StoragePlugin {
     },
 
     /**
-     * Deletes a single object from S3.
+     * Deletes a single object or virtual folder from S3.
      */
     async delete(path: string): Promise<boolean> {
       if (!path) return false;
       const key = cleanPath(path);
+      if (!key) return false;
       const client = getClient();
 
       try {
-        await client.send(
-          new DeleteObjectCommand({
-            Bucket: config.bucket,
-            Key: key,
-          }),
-        );
+        const keysToDelete: string[] = [key];
+
+        let continuationToken: string | undefined = undefined;
+        do {
+          const listRes: ListObjectsV2CommandOutput = await client.send(
+            new ListObjectsV2Command({
+              Bucket: config.bucket,
+              Prefix: `${key}/`,
+              ContinuationToken: continuationToken,
+            }),
+          );
+          if (listRes.Contents) {
+            for (const item of listRes.Contents) {
+              if (item.Key) keysToDelete.push(item.Key);
+            }
+          }
+          continuationToken = listRes.IsTruncated
+            ? listRes.NextContinuationToken
+            : undefined;
+        } while (continuationToken);
+
+        for (let i = 0; i < keysToDelete.length; i += 1000) {
+          const batch = keysToDelete.slice(i, i + 1000);
+          await client.send(
+            new DeleteObjectsCommand({
+              Bucket: config.bucket,
+              Delete: {
+                Objects: batch.map((Key) => ({ Key })),
+                Quiet: true,
+              },
+            }),
+          );
+        }
         return true;
       } catch (error) {
         console.error("S3 delete error:", error);
@@ -156,30 +184,18 @@ export function s3Storage(config: S3Config): StoragePlugin {
     },
 
     /**
-     * Deletes multiple objects from S3 in a single batch.
+     * Deletes multiple objects or folders from S3.
      */
     async deleteMany(paths: string[]): Promise<string[]> {
       if (!paths || paths.length === 0) return [];
-      const client = getClient();
-      const keys = paths.map((p) => cleanPath(p)).filter(Boolean);
+      const deleted: string[] = [];
 
-      if (keys.length === 0) return [];
-
-      try {
-        await client.send(
-          new DeleteObjectsCommand({
-            Bucket: config.bucket,
-            Delete: {
-              Objects: keys.map((Key) => ({ Key })),
-              Quiet: true,
-            },
-          }),
-        );
-        return paths;
-      } catch (error) {
-        console.error("S3 deleteMany error:", error);
-        return [];
+      for (const p of paths) {
+        const ok = await this.delete(p);
+        if (ok) deleted.push(p);
       }
+
+      return deleted;
     },
 
     /**

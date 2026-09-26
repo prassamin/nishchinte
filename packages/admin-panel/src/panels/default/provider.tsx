@@ -5,6 +5,7 @@ import { ConfirmProvider } from "@nishchinte/confirm";
 import { Toast } from "@heroui/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ProgressProvider } from "@bprogress/next/app";
+import { AuthProvider } from "@nishchinte/auth/react";
 
 export function DefaultPanelProvider({
   children,
@@ -25,18 +26,20 @@ export function DefaultPanelProvider({
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ProgressProvider 
-        color={"var(--accent)"}
-        height="2px"
-        options={{
-          showSpinner: false,
-        }}
-      >
-        <ConfirmProvider>
-          <Toast.Provider placement="bottom" />
-          {children}
-        </ConfirmProvider>
-      </ProgressProvider>
+      <AuthProvider>
+        <ProgressProvider 
+          color={"var(--accent)"}
+          height="2px"
+          options={{
+            showSpinner: false,
+          }}
+        >
+          <ConfirmProvider>
+            <Toast.Provider placement="bottom" />
+            {children}
+          </ConfirmProvider>
+        </ProgressProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

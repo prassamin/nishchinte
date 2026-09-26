@@ -1,12 +1,17 @@
 import { ChevronRight, Home } from "lucide-react";
+import { useContent } from "../use-content-manager";
 
 type Props = {
-  path: string;
-  rootPath: string;
-  onNavigate: (path: string) => void;
+  path?: string;
+  rootPath?: string;
+  onNavigate?: (path: string) => void;
 };
 
-export function ContentBreadcrumbs({ path, rootPath, onNavigate }: Props) {
+export function ContentBreadcrumbs(props: Props = {}) {
+  const content = useContent();
+  const path = props.path ?? content.currentPath;
+  const rootPath = props.rootPath ?? content.rootPath;
+  const onNavigate = props.onNavigate ?? content.goToPath;
   const fullSegments = path.split("/").filter(Boolean);
   const rootSegments = rootPath.split("/").filter(Boolean);
   const relativeSegments = fullSegments.slice(rootSegments.length);

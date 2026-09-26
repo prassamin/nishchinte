@@ -11,28 +11,13 @@ import {
   X,
 } from "lucide-react";
 
-import type { SortDirection, SortKey } from "../types";
 import { Dropdown, Header, Label, Spinner, cn } from "@heroui/react";
 import { useRef, useState } from "react";
 import { useConfirm } from "@nishchinte/confirm";
+import { useContent } from "../use-content-manager";
 
 type Props = {
-  onCreateFolder: () => void;
-  onUploadFiles: (files: File[]) => void;
-  onReload: () => void;
-  onSearchChange: (value: string) => void;
-  onSortKeyChange: (value: SortKey) => void;
-  onSortDirectionChange: (value: SortDirection) => void;
-  onDeleteSelected: () => Promise<string[]>;
-  onGoUp: () => void;
-  search: string;
-  sortKey: SortKey;
-  sortDirection: SortDirection;
-  isFetching: boolean;
-  isUploading: boolean;
-  isDeleting: boolean;
-  selectedCount: number;
-  canGoUp: boolean;
+  onCreateFolder?: () => void;
 };
 
 function ToolbarButton({
@@ -77,28 +62,33 @@ function ToolbarButton({
   );
 }
 
-export function ContentToolbar({
-  onCreateFolder,
-  onUploadFiles,
-  onReload,
-  onSearchChange,
-  onSortKeyChange,
-  onSortDirectionChange,
-  onDeleteSelected: onDeleteSelectedProp,
-  onGoUp,
-  search,
-  sortKey,
-  sortDirection,
-  isFetching,
-  isUploading,
-  isDeleting,
-  selectedCount,
-  canGoUp,
-}: Props) {
+export function ContentToolbar({ onCreateFolder }: Props = {}) {
   const { confirm } = useConfirm();
+  const {
+    search,
+    sortKey,
+    sortDirection,
+    isFetching,
+    parentPath,
+    selectedPaths,
+    isUploading,
+    isDeleting,
+    uploadFiles: onUploadFiles,
+    reloadCurrent: onReload,
+    setSearch: onSearchChange,
+    setSortKey: onSortKeyChange,
+    setSortDirection: onSortDirectionChange,
+    deleteSelected: onDeleteSelected,
+    goUp: onGoUp,
+    setCreateFolderOpen,
+  } = useContent();
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const handleCreateFolder = onCreateFolder || (() => setCreateFolderOpen(true));
+
+  const selectedCount = selectedPaths.size;
 
   return (
     <>
@@ -123,14 +113,14 @@ export function ContentToolbar({
         {/* Navigation Group */}
         <div className="flex items-center gap-0.5 p-1 rounded-lg bg-ap-background/60">
           <ToolbarButton
-            label="উপরে"
+            label="Up"
             icon={<ArrowUp />}
             onClick={onGoUp}
-            disabled={!canGoUp}
+            disabled={!Boolean(parentPath)}
           />
 
           <ToolbarButton
-            label="রিফ্রেশ"
+            label="Refresh"
             icon={
               isFetching ? (
                 <Spinner color="current" size="sm" />
@@ -146,16 +136,16 @@ export function ContentToolbar({
         {/* Actions Group */}
         <div className="flex items-center gap-0.5 p-1 rounded-lg bg-ap-background/60">
           <ToolbarButton
-            label="আপলোড"
+            label="Upload"
             icon={<Upload />}
             onClick={() => void uploadInputRef.current?.click()}
             isPending={isUploading}
           />
 
           <ToolbarButton
-            label="ফোল্ডার"
+            label="New Folder"
             icon={<FolderPlus />}
-            onClick={onCreateFolder}
+            onClick={handleCreateFolder}
           />
         </div>
 
@@ -177,7 +167,7 @@ export function ContentToolbar({
                   ? "text-ap-accent bg-ap-accent/10"
                   : "text-ap-muted hover:text-ap-foreground hover:bg-white/60",
               )}
-              title="খুঁজুন"
+              title="Search"
             >
               <Search size={16} />
             </button>
@@ -197,7 +187,7 @@ export function ContentToolbar({
                       setIsSearchExpanded(false);
                     }
                   }}
-                  placeholder="ফাইল খুঁজুন..."
+                  placeholder="Search files..."
                   className="h-8 w-full rounded-lg bg-white/60 px-3 pr-8 text-sm text-ap-foreground placeholder:text-ap-muted/50 outline-none ring-2 ring-transparent focus:ring-ap-accent/30 transition-all"
                 />
                 {search && (
@@ -225,7 +215,7 @@ export function ContentToolbar({
               )}
             >
               <ArrowUpDown size={16} />
-              <span className="hidden md:inline">সাজান</span>
+              <span className="hidden md:inline">Sort</span>
             </Dropdown.Trigger>
             <Dropdown.Popover
               className="min-w-48 p-2 rounded-xl border border-ap-border/40 bg-ap-background/95 backdrop-blur-xl shadow-2xl shadow-black/20"
@@ -235,7 +225,7 @@ export function ContentToolbar({
                 {/* Sort By Section */}
                 <Dropdown.Section>
                   <Header className="text-[11px] font-medium text-ap-muted/60 px-2 py-1.5">
-                    সাজান হিসেবে
+                    Sort by
                   </Header>
                   <Dropdown.Item
                     textValue="Name"
@@ -248,7 +238,7 @@ export function ContentToolbar({
                     onPress={() => onSortKeyChange("name")}
                   >
                     <Label className="flex items-center justify-between text-sm gap-2">
-                      <span>নাম</span>
+                      <span>Name</span>
                       {sortKey === "name" && (
                         <span className="w-1.5 h-1.5 rounded-full bg-ap-accent" />
                       )}
@@ -265,7 +255,7 @@ export function ContentToolbar({
                     onPress={() => onSortKeyChange("createdAt")}
                   >
                     <Label className="flex items-center justify-between text-sm gap-2">
-                      <span>তারিখ</span>
+                      <span>Date</span>
                       {sortKey === "createdAt" && (
                         <span className="w-1.5 h-1.5 rounded-full bg-ap-accent" />
                       )}
@@ -282,7 +272,7 @@ export function ContentToolbar({
                     onPress={() => onSortKeyChange("sizeBytes")}
                   >
                     <Label className="flex items-center justify-between text-sm gap-2">
-                      <span>সাইজ</span>
+                      <span>Size</span>
                       {sortKey === "sizeBytes" && (
                         <span className="w-1.5 h-1.5 rounded-full bg-ap-accent" />
                       )}
@@ -293,7 +283,7 @@ export function ContentToolbar({
                 {/* Sort Order Section */}
                 <Dropdown.Section className="mt-2">
                   <Header className="text-[11px] font-medium text-ap-muted/60 px-2 py-1.5">
-                    ক্রম
+                    Order
                   </Header>
                   <Dropdown.Item
                     textValue="Ascending"
@@ -307,7 +297,7 @@ export function ContentToolbar({
                   >
                     <Label className="flex items-center gap-2 text-sm">
                       <ArrowUpNarrowWide size={14} />
-                      <span>আরোহী</span>
+                      <span>Ascending</span>
                       {sortDirection === "asc" && (
                         <span className="w-1.5 h-1.5 rounded-full bg-ap-accent ml-auto" />
                       )}
@@ -325,7 +315,7 @@ export function ContentToolbar({
                   >
                     <Label className="flex items-center gap-2 text-sm">
                       <ArrowDownWideNarrow size={14} />
-                      <span>অবরোহী</span>
+                      <span>Descending</span>
                       {sortDirection === "desc" && (
                         <span className="w-1.5 h-1.5 rounded-full bg-ap-accent ml-auto" />
                       )}
@@ -343,11 +333,11 @@ export function ContentToolbar({
             type="button"
             onClick={async () => {
               await confirm({
-                title: "নির্বাচিত আইটেম মুছুন",
-                description: `আপনি কি ${selectedCount}টি আইটেম স্থায়ীভাবে মুছে ফেলতে চান?`,
+                title: "Delete Selected Items",
+                description: `Are you sure you want to permanently delete ${selectedCount} selected item(s)?`,
                 isDanger: true,
                 onConfirm: async () => {
-                  await onDeleteSelectedProp();
+                  await onDeleteSelected();
                 },
               });
             }}
@@ -360,7 +350,7 @@ export function ContentToolbar({
                 ? "text-ap-danger hover:bg-ap-danger/10"
                 : "text-ap-muted hover:text-ap-foreground hover:bg-white/60",
             )}
-            title={`নির্বাচিত মুছুন (${selectedCount})`}
+            title={`Delete selected (${selectedCount})`}
           >
             <Trash2 size={16} />
           </button>

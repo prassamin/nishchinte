@@ -100,11 +100,23 @@ export function memoryStorage(config?: MemoryStorageConfig): StoragePlugin {
     },
 
     /**
-     * Deletes a file from memory.
+     * Deletes a file or directory from memory.
      */
     async delete(path: string): Promise<boolean> {
       const clean = cleanPath(path);
-      return files.delete(clean);
+      if (!clean) return false;
+      let deletedAny = false;
+      if (files.delete(clean)) {
+        deletedAny = true;
+      }
+      const prefix = `${clean}/`;
+      for (const key of Array.from(files.keys())) {
+        if (key.startsWith(prefix)) {
+          files.delete(key);
+          deletedAny = true;
+        }
+      }
+      return deletedAny;
     },
 
     /**

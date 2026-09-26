@@ -13,6 +13,7 @@ import { actions } from "@nishchinte/server/actions";
 import type {
   CreateProductInput,
   UpdateProductInput,
+  CategoryItem,
 } from "@nishchinte/server/actions";
 
 function cloneFormData(data: ProductFormData): ProductFormData {
@@ -94,20 +95,16 @@ export function useProductForm() {
     });
   };
 
-  const { data: categories = [], isLoading: isLoadingCategories } = useQuery({
-    queryKey: ["admin-categories"],
+  const { data: categories = [], isLoading: isLoadingCategories } = useQuery<
+    CategoryItem[]
+  >({
+    queryKey: ["categories"],
     queryFn: async () => {
       const res = await actions.product.category.list();
       if (!res.ok) return [];
-      return res.categories.map((c) => ({
-        id: c.id,
-        name: c.name,
-        slug: c.slug,
-        image: c.imageUrl,
-        imageUrl: c.imageUrl,
-      }));
+      return res.categories;
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 60 * 1000,
   });
 
   const { data: editingProduct, isLoading: isLoadingEditingProduct } = useQuery(

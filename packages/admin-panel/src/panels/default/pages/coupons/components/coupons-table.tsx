@@ -205,7 +205,7 @@ export function CouponsTable({
                   const isToggling = togglingId.includes(coupon.id);
 
                   return (
-                    <Table.Row key={coupon.id} id={coupon.id}>
+                    <Table.Row key={coupon.id} id={coupon.id} className={`data-[selected=true]:bg-ap-accent/10`}>
                       <Table.Cell className="pe-0 w-8">
                         <Checkbox
                           aria-label={`Select ${coupon.name}`}
