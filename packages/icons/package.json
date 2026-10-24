@@ -1,0 +1,49 @@
+{
+  "name": "@nishchinte/icons",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "package.json"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "generate": "node scripts/generate.cjs",
+    "clean": "rm -rf dist"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@tabler/icons": "^3.48.0",
+    "@types/node": "^22.20.2",
+    "@types/react": "^19.0.0",
+    "react": "19.2.8",
+    "simple-icons": "^16.33.0",
+    "tsup": "^8.5.1",
+    "typescript": "^5.6.3"
+  },
+  "dependencies": {
+    "lucide-react": "^1.48.0"
+  }
+}
